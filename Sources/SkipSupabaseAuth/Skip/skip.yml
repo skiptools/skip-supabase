@@ -6,3 +6,4 @@ build:
     - block: 'dependencies'
       contents:
         - 'implementation("io.github.jan-tennert.supabase:compose-auth-ui")'
+#
