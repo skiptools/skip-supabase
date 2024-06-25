@@ -26,17 +26,6 @@ let package = Package(
         .package(url: "https://github.com/supabase-community/supabase-swift.git", from: "2.0.0")
     ],
     targets: [
-        .target(name: "SkipSupabase", dependencies: [
-            "SkipSupabaseAuth",
-            "SkipSupabaseFunctions",
-            "SkipSupabasePostgREST",
-            "SkipSupabaseRealtime",
-            "SkipSupabaseStorage"
-        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
-        .testTarget(name: "SkipSupabaseTests", dependencies: [
-            "SkipSupabase",
-            .product(name: "SkipTest", package: "skip")
-        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
         .target(name: "SkipSupabaseCore", dependencies: [
             .product(name: "SkipFoundation", package: "skip-foundation")
         ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
@@ -77,6 +66,17 @@ let package = Package(
         ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
         .testTarget(name: "SkipSupabaseStorageTests", dependencies: [
             "SkipSupabaseStorage",
+            .product(name: "SkipTest", package: "skip")
+        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
+        .target(name: "SkipSupabase", dependencies: [
+            "SkipSupabaseAuth",
+            "SkipSupabaseFunctions",
+            "SkipSupabasePostgREST",
+            "SkipSupabaseRealtime",
+            "SkipSupabaseStorage"
+        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
+        .testTarget(name: "SkipSupabaseTests", dependencies: [
+            "SkipSupabase",
             .product(name: "SkipTest", package: "skip")
         ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
     ]
