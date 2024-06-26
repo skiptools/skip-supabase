@@ -69,6 +69,7 @@ let package = Package(
             .product(name: "SkipTest", package: "skip")
         ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
         .target(name: "SkipSupabase", dependencies: [
+            .product(name: "Supabase", package: "supabase-swift"),
             "SkipSupabaseAuth",
             "SkipSupabaseFunctions",
             "SkipSupabasePostgREST",

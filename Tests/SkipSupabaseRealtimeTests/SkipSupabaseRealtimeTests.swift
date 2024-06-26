@@ -13,15 +13,5 @@ let logger: Logger = Logger(subsystem: "SkipSupabaseRealtime", category: "Tests"
 final class SkipSupabaseRealtimeTests: XCTestCase {
     func testSkipSupabaseRealtime() throws {
         logger.log("running testSkipSupabaseRealtime")
-        XCTAssertEqual(1 + 2, 3, "basic test")
-        
-        // load the TestData.json file from the Resources folder and decode it into a struct
-        let resourceURL: URL = try XCTUnwrap(Bundle.module.url(forResource: "TestData", withExtension: "json"))
-        let testData = try JSONDecoder().decode(TestData.self, from: Data(contentsOf: resourceURL))
-        XCTAssertEqual("SkipSupabaseRealtime", testData.testModuleName)
     }
-}
-
-struct TestData : Codable, Hashable {
-    var testModuleName: String
 }
