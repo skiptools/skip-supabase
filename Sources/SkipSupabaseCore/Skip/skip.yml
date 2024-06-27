@@ -17,3 +17,5 @@ build:
     - block: 'dependencies'
       contents:
         - 'implementation(platform(libs.supabase.bom))'
+        # need a client engine for Supabase: https://ktor.io/docs/client-engines.html#okhttp
+        - 'implementation("io.ktor:ktor-client-okhttp:2.3.12")'
