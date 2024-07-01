@@ -16,6 +16,7 @@ struct Country: Codable {
 
 @available(macOS 13, *)
 final class SkipSupabaseTests: XCTestCase {
+    // SKIP NOWARN
     func testSkipSupabase() async throws {
         logger.log("running testSkipSupabase")
         let client = SupabaseClient(
@@ -24,20 +25,31 @@ final class SkipSupabaseTests: XCTestCase {
         )
 
         // clear the countries table
-        let cquery = client.from("countries")
-
-        #if !SKIP
-
-        try await cquery
+        try await client
+            .from("countries")
             .delete()
             .gte("id", value: 0)
             .execute()
 
-        // insert single
-        try await client
+        // count query
+        let countryCount0 = try await client
             .from("countries")
-            .insert(Country(id: 1, name: "USA"))
+            .select(count: CountOption.exact)
             .execute()
+
+        XCTAssertEqual(0, countryCount0.count)
+
+        #if !SKIP
+
+        // insert single
+        let icountry: Country = try await client
+            .from("countries")
+            .insert(Country(id: 1, name: "USA"), returning: .representation)
+            .single()
+            .execute()
+            .value
+
+        XCTAssertEqual(1, icountry.id)
 
         // insert array
         try await client
