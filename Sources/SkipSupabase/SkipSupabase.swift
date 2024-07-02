@@ -31,7 +31,7 @@ public class SupabaseClient {
 
     public init(supabaseURL: URL, supabaseKey: String) {
         self.client = createSupabaseClient(supabaseUrl: supabaseURL.absoluteString, supabaseKey: supabaseKey) {
-            // defaultSerializer = JacksonSerializer() // TODO: custom serializer that uses Skip Encodable/Decodable
+            defaultSerializer = CodableSerializer()
 
             //install(Auth)
             install(Postgrest)
@@ -43,6 +43,24 @@ public class SupabaseClient {
 
     public func from(_ tableName: String) -> PostgrestQueryBuilder {
         PostgrestQueryBuilder(builder: client.from(tableName))
+    }
+}
+
+class CodableSerializer: io.github.jan.supabase.SupabaseSerializer {
+
+    override func encode<T: Any>(type: kotlin.reflect.KType, value: T) -> String {
+        var v: Any = value
+        if let collection = v as? java.util.Collection<Any> {
+            v = skip.lib.Array(collection)
+        }
+
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(v)
+        return String(data: data, encoding: String.Encoding.utf8) ?? ""
+    }
+
+    override func decode<T: Any>(type: kotlin.reflect.KType, value: String) -> T {
+        fatalError("TODO")
     }
 }
 
@@ -61,24 +79,24 @@ public class PostgrestQueryBuilder {
         return PostgrestFilterBuilder(queryBuilder: self)
     }
 
-    func delete() -> PostgrestFilterBuilder {
+    public func delete() -> PostgrestFilterBuilder {
         createFilterBuilder(operation: .delete)
     }
 
-    func select(_ columns: String = "*", head: Bool = false, count: CountOption? = nil) -> PostgrestFilterBuilder {
+    public func select(_ columns: String = "*", head: Bool = false, count: CountOption? = nil) -> PostgrestFilterBuilder {
         createFilterBuilder(operation: .select)
             .countOption(count)
     }
 
-    func update(value: Any) -> PostgrestFilterBuilder {
+    public func update(value: Any) -> PostgrestFilterBuilder {
         createFilterBuilder(operation: .update(value))
     }
 
-    func insert(value: Any) -> PostgrestFilterBuilder {
+    public func insert(value: Any, returning: PostgrestReturningOptions = .minimal) -> PostgrestFilterBuilder {
         createFilterBuilder(operation: .insert(value))
     }
 
-    func upsert(value: Any) -> PostgrestFilterBuilder {
+    public func upsert(value: Any) -> PostgrestFilterBuilder {
         createFilterBuilder(operation: .upsert(value))
     }
 
@@ -88,15 +106,129 @@ public class PostgrestQueryBuilder {
 
 }
 
-public class PostgrestFilterBuilder {
+public class PostgrestBuilder {
     fileprivate let queryBuilder: PostgrestQueryBuilder
-    //private var requests: [(io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> ()] = []
-    fileprivate var filters: [(io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder) -> ()] = []
-    fileprivate var countOption: CountOption? = nil
 
     init(queryBuilder: PostgrestQueryBuilder) {
         self.queryBuilder = queryBuilder
     }
+
+//    public func execute(void: Void? = nil) async -> PostgrestResponse<Void> {
+//        execute()
+//    }
+
+    public func execute<T>() async -> PostgrestResponse<T> {
+        switch queryBuilder.operation {
+        case .select:
+            return PostgrestResponse(result: queryBuilder.builder.select(request: buildRequest()))
+        case .delete:
+            return PostgrestResponse(result: queryBuilder.builder.delete(request: buildRequest()))
+        case .insert(let x):
+            return PostgrestResponse(result: queryBuilder.builder.insert(value: x, request: buildRequest()))
+        case .update(let x):
+            return PostgrestResponse(result: queryBuilder.builder.update(value: x, request: buildRequest()))
+        case .upsert(let x):
+            return PostgrestResponse(result: queryBuilder.builder.upsert(value: x, request: buildRequest()))
+        }
+
+    }
+
+    func buildRequest() -> (io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> () {
+        { _ in
+        }
+    }
+}
+
+public class PostgrestTransformBuilder : PostgrestBuilder {
+    /// Perform a SELECT on the query result.
+    ///
+    /// By default, `.insert()`, `.update()`, `.upsert()`, and `.delete()` do not return modified rows. By calling this method, modified rows are returned in `value`.
+    ///
+    /// - Parameters:
+    ///   - columns: The columns to retrieve, separated by commas.
+//    public func select(_ columns: String = "*") -> PostgrestTransformBuilder
+
+    /// Order the query result by `column`.
+    ///
+    /// You can call this method multiple times to order by multiple columns.
+    /// You can order referenced tables, but it only affects the ordering of theparent table if you use `!inner` in the query.
+    ///
+    /// - Parameters:
+    ///   - column: The column to order by.
+    ///   - ascending: If `true`, the result will be in ascending order.
+    ///   - nullsFirst: If `true`, `null`s appear first. If `false`, `null`s appear last.
+    ///   - referencedTable: Set this to order a referenced table by its columns.
+//    public func order(
+//      _ column: String,
+//      ascending: Bool = true,
+//      nullsFirst: Bool = false,
+//      referencedTable: String? = nil
+//    ) -> PostgrestTransformBuilder
+
+    /// Limits the query result by `count`.
+    /// - Parameters:
+    ///   - count: The maximum number of rows to return.
+    ///   - referencedTable: Set this to limit rows of referenced tables instead of the parent table.
+//    public func limit(_ count: Int, referencedTable: String? = nil) -> PostgrestTransformBuilder
+
+    /// Limit the query result by starting at an offset (`from`) and ending at the offset (`from + to`).
+    ///
+    /// Only records within this range are returned.
+    /// This respects the query order and if there is no order clause the range could behave unexpectedly.
+    /// The `from` and `to` values are 0-based and inclusive: `range(from: 1, to: 3)` will include the second, third and fourth rows of the query.
+    ///
+    /// - Parameters:
+    ///   - from: The starting index from which to limit the result.
+    ///   - to: The last index to which to limit the result.
+    ///   - referencedTable: Set this to limit rows of referenced tables instead of the parent table.
+//    public func range(
+//      from: Int,
+//      to: Int,
+//      referencedTable: String? = nil
+//    ) -> PostgrestTransformBuilder
+
+    /// Return `value` as a single object instead of an array of objects.
+    ///
+    /// Query result must be one row (e.g. using `.limit(1)`), otherwise this returns an error.
+    public func single() -> PostgrestTransformBuilder {
+        return self
+    }
+
+    ///  Return `value` as a string in CSV format.
+//    public func csv() -> PostgrestTransformBuilder
+
+    /// Return `value` as an object in [GeoJSON](https://geojson.org) format.
+//    public func geojson() -> PostgrestTransformBuilder
+
+    /// Return `data` as the EXPLAIN plan for the query.
+    ///
+    /// You need to enable the [db_plan_enabled](https://supabase.com/docs/guides/database/debugging-performance#enabling-explain)
+    /// setting before using this method.
+    ///
+    /// - Parameters:
+    ///   - analyze: If `true`, the query will be executed and the actual run time will be returned
+    ///   - verbose: If `true`, the query identifier will be returned and `data` will include the
+    /// output columns of the query
+    ///   - settings: If `true`, include information on configuration parameters that affect query
+    /// planning
+    ///   - buffers: If `true`, include information on buffer usage
+    ///   - wal: If `true`, include information on WAL record generation
+    ///   - format: The format of the output, can be `"text"` (default) or `"json"`
+//    public func explain(
+//      analyze: Bool = false,
+//      verbose: Bool = false,
+//      settings: Bool = false,
+//      buffers: Bool = false,
+//      wal: Bool = false,
+//      format: String = "text"
+//    ) -> PostgrestTransformBuilder
+
+}
+
+public class PostgrestFilterBuilder : PostgrestTransformBuilder {
+    //private var requests: [(io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> ()] = []
+    fileprivate var filters: [(io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder) -> ()] = []
+    fileprivate var countOption: CountOption? = nil
 
     fileprivate func countOption(_ countOption: CountOption?) -> PostgrestFilterBuilder {
         synchronized(self) { self.countOption = countOption }
@@ -169,7 +301,7 @@ public class PostgrestFilterBuilder {
         return self
     }
 
-    private func buildRequest() -> (io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> () {
+    override func buildRequest() -> (io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> () {
         return { builder in
             if !filters.isEmpty {
                 builder.filter {
@@ -189,21 +321,6 @@ public class PostgrestFilterBuilder {
         }
     }
 
-    public func execute() async -> PostgrestResponse<Void> {
-        switch queryBuilder.operation {
-        case .select:
-            return PostgrestResponse(result: queryBuilder.builder.select(request: buildRequest()))
-        case .delete:
-            return PostgrestResponse(result: queryBuilder.builder.delete(request: buildRequest()))
-        case .insert(let x):
-            return PostgrestResponse(result: queryBuilder.builder.insert(value: x, request: buildRequest()))
-        case .update(let x):
-            return PostgrestResponse(result: queryBuilder.builder.update(value: x, request: buildRequest()))
-        case .upsert(let x):
-            return PostgrestResponse(result: queryBuilder.builder.upsert(value: x, request: buildRequest()))
-        }
-
-    }
 }
 
 public struct PostgrestResponse<T> {
@@ -213,9 +330,14 @@ public struct PostgrestResponse<T> {
         self.result = result
     }
 
-    public var count: Int64? {
-        result.countOrNull()
+    public var count: Int? {
+        result.countOrNull()?.toInt()
     }
+
+    public var value: T! {
+        nil // TODO
+    }
+
 
     //public let data: Data
     //public let response: HTTPURLResponse

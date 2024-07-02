@@ -25,31 +25,39 @@ final class SkipSupabaseTests: XCTestCase {
         )
 
         // clear the countries table
-        try await client
+        let xxx: PostgrestResponse<Void> = try await client
             .from("countries")
             .delete()
             .gte("id", value: 0)
             .execute()
 
-        // count query
-        let countryCount0 = try await client
+        func assertCount(_ table: String, count: Int) async throws {
+            // count query
+            let countryCount0: PostgrestResponse<Void> = try await client
+                .from(table)
+                .select(count: CountOption.exact)
+                .execute()
+            XCTAssertEqual(count, countryCount0.count)
+        }
+
+        try await assertCount("countries", count: 0)
+
+        // insert single
+        let icountryResponse: PostgrestResponse<Country> = try await client
             .from("countries")
-            .select(count: CountOption.exact)
+            .insert(Country(id: 1, name: "USA"), returning: PostgrestReturningOptions.representation)
+            .single()
             .execute()
 
-        XCTAssertEqual(0, countryCount0.count)
+        try await assertCount("countries", count: 1)
 
         #if !SKIP
 
-        // insert single
-        let icountry: Country = try await client
-            .from("countries")
-            .insert(Country(id: 1, name: "USA"), returning: .representation)
-            .single()
-            .execute()
+        let icountry = icountryResponse
             .value
 
         XCTAssertEqual(1, icountry.id)
+
 
         // insert array
         try await client
