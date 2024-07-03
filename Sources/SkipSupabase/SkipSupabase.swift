@@ -47,9 +47,9 @@ public class SupabaseClient {
 }
 
 class CodableSerializer: io.github.jan.supabase.SupabaseSerializer {
-
     override func encode<T: Any>(type: kotlin.reflect.KType, value: T) -> String {
         var v: Any = value
+        // individual values are wrapped in a Collections$SingletonList instance, so they need to be converted to a skip.lib.Array to encode them
         if let collection = v as? java.util.Collection<Any> {
             v = skip.lib.Array(collection)
         }
@@ -61,6 +61,9 @@ class CodableSerializer: io.github.jan.supabase.SupabaseSerializer {
 
     override func decode<T: Any>(type: kotlin.reflect.KType, value: String) -> T {
         fatalError("TODO")
+//        let decoder = JSONDecoder()
+//        let klass = type.classifier as kotlin.reflect.KClass<T> // Argument type mismatch: actual type is 'kotlin.reflect.KClass<T>', but 'kotlin.reflect.KClass<T>' was expected.
+//        return decoder.decode(klass, value.data(using: String.Encoding.utf8) ?? Data())
     }
 }
 
