@@ -24,6 +24,16 @@ import io.github.jan.supabase.postgrest.query.Columns
 
 #endif
 
+#if !SKIP
+extension PostgrestResponse {
+    //var value: T
+
+//    func getValue<T>(ofType: T.Type) throws -> T {
+//        return self.value
+//    }
+}
+#endif
+
 #if SKIP
 
 public class SupabaseClient {
@@ -116,11 +126,11 @@ public class PostgrestBuilder {
         self.queryBuilder = queryBuilder
     }
 
-//    public func execute(void: Void? = nil) async -> PostgrestResponse<Void> {
-//        execute()
-//    }
+    public func execute() async -> PostgrestResponse<Void> {
+        execute(options: nil)
+    }
 
-    public func execute<T>() async -> PostgrestResponse<T> {
+    public func execute<T>(options: FetchOptions? = nil, void: Void? = nil) async -> PostgrestResponse<T> {
         switch queryBuilder.operation {
         case .select:
             return PostgrestResponse(result: queryBuilder.builder.select(request: buildRequest()))
@@ -350,6 +360,23 @@ public struct PostgrestResponse<T> {
 //    public var status: Int {
 //        response.statusCode
 //    }
+}
+
+
+/// Options for querying Supabase.
+public struct FetchOptions: Sendable {
+    /// Set head to true if you only want the count value and not the underlying data.
+    public let head: Bool
+
+    /// count options can be used to retrieve the total number of rows that satisfies the
+    /// query. The value for count respects any filters (e.g. eq, gt), but ignores
+    /// modifiers (e.g. limit, range).
+    public let count: CountOption?
+
+    public init(head: Bool = false, count: CountOption? = nil) {
+        self.head = head
+        self.count = count
+    }
 }
 
 /// Returns count as part of the response when specified.

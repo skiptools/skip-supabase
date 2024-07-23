@@ -25,7 +25,7 @@ final class SkipSupabaseTests: XCTestCase {
         )
 
         // clear the countries table
-        let xxx: PostgrestResponse<Void> = try await client
+        try await client
             .from("countries")
             .delete()
             .gte("id", value: 0)
@@ -47,7 +47,7 @@ final class SkipSupabaseTests: XCTestCase {
             .from("countries")
             .insert(Country(id: 1, name: "USA"), returning: PostgrestReturningOptions.representation)
             .single()
-            .execute()
+            .execute(options: FetchOptions(head: false, count: CountOption.exact))
 
         try await assertCount("countries", count: 1)
 
