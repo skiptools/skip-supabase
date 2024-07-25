@@ -10,10 +10,9 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.FlowType
 import io.github.jan.supabase.createSupabaseClient
 
-//import io.github.jan.supabase.auth.Auth
-//import io.github.jan.supabase.auth.auth
-//import io.github.jan.supabase.gotrue.GoTrue
-//import io.github.jan.supabase.gotrue.gotrue
+import io.github.jan.supabase.gotrue.Auth
+import io.github.jan.supabase.gotrue.auth
+import io.github.jan.supabase.gotrue.minimalSettings
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.Storage
@@ -43,7 +42,15 @@ public class SupabaseClient {
         self.client = createSupabaseClient(supabaseUrl: supabaseURL.absoluteString, supabaseKey: supabaseKey) {
             defaultSerializer = CodableSerializer()
 
-            //install(Auth)
+            install(Auth) {
+                // needed or else NPE on startup: https://github.com/supabase-community/supabase-kt/issues/69
+                // and java.lang.ExceptionInInitializerError: Exception java.lang.IllegalStateException: Failed to create default settings for SettingsSessionManager. You might have to provide a custom settings instance or a custom session manager. Learn more at https://github.com/supabase-community/supabase-kt/wiki/Session-Saving
+                //sessionManager = io.github.jan.supabase.gotrue.SettingsSessionManager(com.russhwolf.settings.MapSettings())
+                //sessionManager = io.github.jan.supabase.gotrue.MemorySessionManager()
+
+                // TODO: enable only when running in Robolectric tests
+                minimalSettings() // “Applies minimal settings to the [AuthConfig]. This is useful for server side applications, where you don't need to store the session or code verifier.”
+            }
             install(Postgrest)
             install(Storage) {
                 //transferTimeout = 120.seconds // Default: 120 seconds
@@ -51,9 +58,79 @@ public class SupabaseClient {
         }
     }
 
+    public var auth: AuthClient {
+        AuthClient(auth: client.auth)
+    }
+
     public func from(_ tableName: String) -> PostgrestQueryBuilder {
         PostgrestQueryBuilder(builder: client.from(tableName))
     }
+}
+
+public class AuthClient {
+    fileprivate let auth: io.github.jan.supabase.gotrue.Auth
+
+    init(auth: io.github.jan.supabase.gotrue.Auth) {
+        self.auth = auth
+    }
+
+    public var currentSession: Session? {
+        guard let session = auth.currentSessionOrNull() else {
+            return nil
+        }
+
+        return Session(session: session)
+    }
+}
+
+public class Session {
+    fileprivate let session: io.github.jan.supabase.gotrue.user.UserSession
+
+    init(session: io.github.jan.supabase.gotrue.user.UserSession) {
+        self.session = session
+    }
+
+    public var user: User {
+        User(userInfo: session.user!)
+    }
+}
+
+func instant2date(_ instant: kotlinx.datetime.Instant?) -> Date? {
+    guard let instant = instant else { return nil }
+    return Date(platformValue: java.util.Date(instant.toEpochMilliseconds()))
+
+}
+
+public class User {
+    fileprivate let userInfo: io.github.jan.supabase.gotrue.user.UserInfo
+
+    init(userInfo: io.github.jan.supabase.gotrue.user.UserInfo) {
+        self.userInfo = userInfo
+    }
+
+    public var id: UUID { UUID(uuidString: userInfo.id)! }
+//    public var appMetadata: [String: AnyJSON]
+//    public var userMetadata: [String: AnyJSON]
+    public var aud: String { userInfo.aud }
+    public var confirmationSentAt: Date? { instant2date(userInfo.confirmationSentAt) }
+    public var recoverySentAt: Date? { instant2date(userInfo.recoverySentAt) }
+    public var emailChangeSentAt: Date? { instant2date(userInfo.emailChangeSentAt) }
+    public var newEmail: String? { userInfo.newEmail }
+    public var invitedAt: Date? { instant2date(userInfo.invitedAt) }
+    public var actionLink: String? { userInfo.actionLink }
+    public var email: String? { userInfo.email }
+    public var phone: String? { userInfo.phone }
+    public var createdAt: Date { instant2date(userInfo.createdAt)! }
+    public var confirmedAt: Date? { instant2date(userInfo.confirmedAt) }
+    public var emailConfirmedAt: Date? { instant2date(userInfo.emailConfirmedAt) }
+    public var phoneConfirmedAt: Date? { instant2date(userInfo.phoneConfirmedAt) }
+    public var lastSignInAt: Date? { instant2date(userInfo.lastSignInAt) }
+    public var role: String? { userInfo.role }
+    public var updatedAt: Date { instant2date(userInfo.updatedAt)! }
+//    public var identities: [UserIdentity]?
+//    public var isAnonymous: Bool { userInfo.isAnonymous }
+//    public var factors: [Factor]?
+
 }
 
 class CodableSerializer: io.github.jan.supabase.SupabaseSerializer {
