@@ -38,6 +38,18 @@ final class SkipSupabaseTests: XCTestCase {
         XCTAssertNil(ac.currentSession?.user.phone)
         XCTAssertNil(ac.currentSession?.user.role)
         XCTAssertNil(ac.currentSession?.user.updatedAt)
+
+        do {
+            try await ac.signIn(email: "", password: "")
+            try await ac.signIn(email: "", password: "", captchaToken: "")
+            try await ac.signOut()
+            try await ac.signOut(scope: .global)
+            try await ac.signOut(scope: .local)
+            try await ac.signOut(scope: .others)
+            XCTFail("signIn should have failed")
+        } catch {
+            // expected
+        }
     }
 
     func testSkipSupabaseDatabase() async throws {

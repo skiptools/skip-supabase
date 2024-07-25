@@ -13,6 +13,7 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.minimalSettings
+import io.github.jan.supabase.gotrue.providers.builtin.Email
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.Storage
@@ -80,6 +81,36 @@ public class AuthClient {
         }
 
         return Session(session: session)
+    }
+
+    public func signIn(email: String, password: String, captchaToken: String? = nil) async throws {
+        try await auth.signInWith(Email) {
+            self.email = email
+            self.password = password
+        }
+    }
+
+    public func signOut(scope: SignOutScope = .global) async throws {
+        try await auth.signOut(scope.kotlinScope)
+    }
+}
+
+public enum SignOutScope: String, Sendable {
+    /// All sessions by this account will be signed out.
+    case global
+    /// Only this session will be signed out.
+    case local
+    /// All other sessions except the current one will be signed out. When using
+    /// ``SignOutScope/others``, there is no ``AuthChangeEvent/signedOut`` event fired on the current
+    /// session.
+    case others
+
+    var kotlinScope: io.github.jan.supabase.gotrue.SignOutScope {
+        switch self {
+        case .global: return io.github.jan.supabase.gotrue.SignOutScope.GLOBAL
+        case .local: return io.github.jan.supabase.gotrue.SignOutScope.LOCAL
+        case .others: return io.github.jan.supabase.gotrue.SignOutScope.OTHERS
+        }
     }
 }
 
