@@ -13,7 +13,6 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.minimalSettings
-import io.github.jan.supabase.gotrue.providers.builtin.Email
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.Storage
@@ -75,6 +74,12 @@ public class AuthClient {
         self.auth = auth
     }
 
+    public var session: Session {
+        get throws {
+            fatalError("TODO")
+        }
+    }
+
     public var currentSession: Session? {
         guard let session = auth.currentSessionOrNull() else {
             return nil
@@ -84,10 +89,30 @@ public class AuthClient {
     }
 
     public func signIn(email: String, password: String, captchaToken: String? = nil) async throws {
-        try await auth.signInWith(Email) {
+        try await auth.signInWith(io.github.jan.supabase.gotrue.providers.builtin.Email) {
+            self.email = email
+            self.password = password
+            self.captchaToken = captchaToken
+        }
+    }
+
+    public func signUp(email: String, password: String) async throws {
+        try await auth.signUpWith(io.github.jan.supabase.gotrue.providers.builtin.Email) {
             self.email = email
             self.password = password
         }
+    }
+
+    public func signIn(phone: String, password: String, captchaToken: String? = nil) async throws {
+        try await auth.signInWith(io.github.jan.supabase.gotrue.providers.builtin.Phone) {
+            self.phone = phone
+            self.password = password
+            self.captchaToken = captchaToken
+        }
+    }
+
+    public func signInAnonymously(data: [String: AnyJSON]? = nil, captchaToken: String? = nil) async throws {
+        try await auth.signInAnonymously(data: dict2JsonObject(data), captchaToken: captchaToken)
     }
 
     public func signOut(scope: SignOutScope = .global) async throws {
@@ -95,14 +120,40 @@ public class AuthClient {
     }
 }
 
+
+public typealias JSONObject = [String: AnyJSON]
+public typealias JSONArray = [AnyJSON]
+
+/// An enumeration that represents JSON-compatible values of various types.
+/// Copied from Supabase.Helpers.AnyJSON
+public enum AnyJSON: Hashable {
+    /// Represents a `null` JSON value.
+    case null
+    /// Represents a JSON boolean value.
+    case bool(Bool)
+    /// Represents a JSON number (integer) value.
+    case integer(Int)
+    /// Represents a JSON number (floating-point) value.
+    case double(Double)
+    /// Represents a JSON string value.
+    case string(String)
+    /// Represents a JSON object (dictionary) value.
+    case object(JSONObject)
+    /// Represents a JSON array (list) value.
+    case array(JSONArray)
+}
+
+func dict2JsonObject(_ dict: [String: AnyJSON]?) -> kotlinx.serialization.json.JsonObject? {
+    // TODO: convert Swift [String: AnyJSON]? parameter to Kotlin JsonObject?
+    return nil
+}
+
 public enum SignOutScope: String, Sendable {
     /// All sessions by this account will be signed out.
     case global
     /// Only this session will be signed out.
     case local
-    /// All other sessions except the current one will be signed out. When using
-    /// ``SignOutScope/others``, there is no ``AuthChangeEvent/signedOut`` event fired on the current
-    /// session.
+    /// All other sessions except the current one will be signed out.
     case others
 
     var kotlinScope: io.github.jan.supabase.gotrue.SignOutScope {

@@ -42,10 +42,25 @@ final class SkipSupabaseTests: XCTestCase {
         do {
             try await ac.signIn(email: "", password: "")
             try await ac.signIn(email: "", password: "", captchaToken: "")
+            try await ac.signIn(phone: "", password: "")
+            try await ac.signIn(phone: "", password: "", captchaToken: "")
+            try await ac.signInAnonymously()
+            try await ac.signInAnonymously(captchaToken: "")
+            //try await ac.signInAnonymously(data: ["key": .string("value")])
+
+            //try await ac.signInWithSSO(domain: <#T##String#>, redirectTo: <#T##URL?#>, captchaToken: <#T##String?#>)
+            //try await ac.signInWithOTP(phone: <#T##String#>, channel: <#T##MessagingChannel#>, shouldCreateUser: <#T##Bool#>, data: <#T##[String : AnyJSON]?#>, captchaToken: <#T##String?#>)
+            //try await ac.signInWithOTP(email: <#T##String#>, redirectTo: <#T##URL?#>, shouldCreateUser: <#T##Bool#>, data: <#T##[String : AnyJSON]?#>, captchaToken: <#T##String?#>)
+            //try await ac.signInWithOAuth(provider: <#T##Provider#>, redirectTo: <#T##URL?#>, scopes: <#T##String?#>, queryParams: <#T##[(name: String, value: String?)]#>, configure: <#T##(ASWebAuthenticationSession) -> Void##(ASWebAuthenticationSession) -> Void##(_ session: ASWebAuthenticationSession) -> Void#>)
+
+
             try await ac.signOut()
             try await ac.signOut(scope: .global)
             try await ac.signOut(scope: .local)
             try await ac.signOut(scope: .others)
+
+            //let _: AsyncStream<(event: AuthChangeEvent, session: Session?)> = ac.authStateChanges
+
             XCTFail("signIn should have failed")
         } catch {
             // expected
