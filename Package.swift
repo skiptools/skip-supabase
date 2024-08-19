@@ -21,8 +21,8 @@ let package = Package(
         .library(name: "SkipSupabaseStorage", targets: ["SkipSupabaseStorage"]),
     ],
     dependencies: [
-        .package(url: "https://source.skip.tools/skip.git", from: "0.10.7"),
-        .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.7.1"),
+        .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+        .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0"),
         .package(url: "https://github.com/supabase-community/supabase-swift.git", from: "2.14.3")
     ],
     targets: [
