@@ -21,7 +21,6 @@ fileprivate let client = SupabaseClient(
 )
 
 
-// SKIP INSERT: @org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)
 final class SkipSupabaseTests: XCTestCase {
     func testSkipSupabaseAuth() async throws {
 
