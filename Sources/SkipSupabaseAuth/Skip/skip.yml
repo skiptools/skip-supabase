@@ -5,7 +5,7 @@ build:
   contents:
     - block: 'dependencies'
       contents:
-        - 'implementation("io.github.jan-tennert.supabase:gotrue-kt")'
+        - 'implementation("io.github.jan-tennert.supabase:auth-kt")'
         - 'implementation("io.github.jan-tennert.supabase:compose-auth")'
         - 'implementation("io.github.jan-tennert.supabase:compose-auth-ui")'
 
