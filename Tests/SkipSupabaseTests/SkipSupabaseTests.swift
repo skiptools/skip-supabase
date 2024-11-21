@@ -70,7 +70,7 @@ final class SkipSupabaseTests: XCTestCase {
         logger.log("running testSkipSupabase")
 
         // clear the countries table
-        try await client
+        let voidResponse: PostgrestResponse<Void> = try await client
             .from("countries")
             .delete()
             .gte("id", value: 0)
@@ -88,21 +88,20 @@ final class SkipSupabaseTests: XCTestCase {
         try await assertCount("countries", count: 0)
 
         // insert single
-        let icountryResponse: PostgrestResponse<Country> = try await client
+        let icountryResponse: PostgrestResponse<[Country]> = try await client
             .from("countries")
             .insert(Country(id: 1, name: "USA"), returning: PostgrestReturningOptions.representation)
-            .single()
+            // .single() // TODO: handle single results
             .execute(options: FetchOptions(head: false, count: CountOption.exact))
 
         try await assertCount("countries", count: 1)
 
+        let icountry: [Country] = icountryResponse.value
+        XCTAssertEqual(1, icountry.first?.id)
+
         #if !SKIP
 
-        let icountry = icountryResponse
-            .value
-
-        XCTAssertEqual(1, icountry.id)
-
+        // FIXME Kotlin: SkipSupabase.kt:900 testSkipModule(): java.lang.IllegalArgumentException: Element class kotlinx.serialization.json.JsonArray is not a JsonObject
 
         // insert array
         try await client
@@ -120,6 +119,7 @@ final class SkipSupabaseTests: XCTestCase {
             .execute()
 
         XCTAssertEqual(3, countryCount.count)
+
 
         // query single row
         let countries: [Country] = try await client
@@ -158,4 +158,22 @@ final class SkipSupabaseTests: XCTestCase {
 
         #endif
     }
+
+    func testSkipSupabaseRPC() async throws {
+        // SKIP NOWARN
+        let rpc1: PostgrestResponse<Void> = try await client
+            .rpc("rpc_test")
+            .execute()
+
+        XCTAssertEqual(rpc1.status, 200)
+        XCTAssertEqual(String(data: rpc1.data, encoding: .utf8), "\"Hello Supabase RPC\"")
+
+        let value1: Void = rpc1.value
+
+//        let rpc2: Void = try await client
+//            .rpc("rpc_test_params", params: Country(id: 2, name: "France"))
+//            .execute()
+//            .value
+    }
+
 }
