@@ -18,8 +18,17 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
 
+import io.github.jan.supabase.postgrest.RpcMethod
+import io.github.jan.supabase.postgrest.rpc
+
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
+
+import io.github.jan.supabase.SupabaseSerializer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
+import kotlin.reflect.KType
+import kotlin.reflect.javaType
 
 #endif
 
@@ -64,6 +73,15 @@ public class SupabaseClient {
 
     public func from(_ tableName: String) -> PostgrestQueryBuilder {
         PostgrestQueryBuilder(builder: client.from(tableName))
+    }
+
+    @inline(__always) public func rpc(_ fn: String) async -> PostgrestFilterBuilder {
+        return PostgrestRpcBuilder(fname: fn, client: client).createFilterBuilder()
+    }
+
+    @inline(__always) public func rpc<T: Encodable>(_ fn: String, params: T) async -> PostgrestFilterBuilder {
+        fatalError("TODO: rpc with parameters")
+        //return PostgrestRpcBuilder(fname: fn, client: client).createFilterBuilder()
     }
 }
 
@@ -225,20 +243,62 @@ class CodableSerializer: io.github.jan.supabase.SupabaseSerializer {
 
         let encoder = JSONEncoder()
         let data = try encoder.encode(v)
-        return String(data: data, encoding: String.Encoding.utf8) ?? ""
+        return String(data: data, encoding: String.Encoding.utf8)!
     }
 
+    // SKIP INSERT: @OptIn(ExperimentalStdlibApi::class)
     override func decode<T: Any>(type: kotlin.reflect.KType, value: String) -> T {
-        fatalError("TODO")
-//        let decoder = JSONDecoder()
-//        let klass = type.classifier as kotlin.reflect.KClass<T> // Argument type mismatch: actual type is 'kotlin.reflect.KClass<T>', but 'kotlin.reflect.KClass<T>' was expected.
-//        return decoder.decode(klass, value.data(using: String.Encoding.utf8) ?? Data())
+        // cannot use Kotlin serialization (which may not be compatible with our Codable serialization)
+        // Caused by: java.lang.IllegalArgumentException: Captured type parameter T from generic non-reified function. Such functionality cannot be supported because T is erased, either specify serializer explicitly or make calling function inline with reified T.
+        //return Json.decodeFromString(serializer(type), value) as T
+
+        let data = value.data(using: String.Encoding.utf8) ?? Data()
+
+        let decoder = JSONDecoder()
+        //return try decoder.decode(T.self, data) // Argument type mismatch: actual type is 'kotlin.reflect.KClass<ERROR CLASS: Type parameter T in qualified access>', but 'kotlin.reflect.KClass<T>' was expected.
+
+        //return try decoder.decode(type, data) // Argument type mismatch: actual type is 'kotlin.reflect.KType', but 'kotlin.reflect.KClass<T>' was expected.
+
+//        // let klass: kotlin.reflect.KClass<T> = type.classifier as kotlin.reflect.KClass<T> // Argument type mismatch: actual type is 'kotlin.reflect.KClass<T>', but 'kotlin.reflect.KClass<T>' was expected.
+
+        let klassifier: kotlin.reflect.KClassifier = type.classifier!
+
+//        if let param = klassifier as? kotlin.reflect.KTypeParameter {
+//            print("### klassifier param: \(param) \(param.upperBounds)")
+//        }
+//
+        // SKIP INSERT: val klass: kotlin.reflect.KClass<T> = klassifier as kotlin.reflect.KClass<T>
+
+        fatalError("deserialize requires reified type; decode at call site instead")
     }
 }
 
-public class PostgrestQueryBuilder {
+public protocol PostgrestExecutor {
+    func execute(requestBuilder: (io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> ()) async -> io.github.jan.supabase.postgrest.result.PostgrestResult
+}
+
+public final class PostgrestRpcBuilder: PostgrestExecutor {
+    private let fname: String
+    private let client: io.github.jan.supabase.SupabaseClient
+
+    init(fname: String, client: io.github.jan.supabase.SupabaseClient) {
+        self.fname = fname
+        self.client = client
+    }
+
+    func createFilterBuilder() -> PostgrestFilterBuilder {
+        return PostgrestFilterBuilder(executor: self)
+    }
+
+    public override func execute(requestBuilder: (io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> ()) async -> io.github.jan.supabase.postgrest.result.PostgrestResult {
+        return await self.client.postgrest.rpc(fname)
+    }
+}
+
+public final class PostgrestQueryBuilder : PostgrestExecutor {
     fileprivate let builder: io.github.jan.supabase.postgrest.query.PostgrestQueryBuilder
     fileprivate var operation: Operation = .select
+    fileprivate var returning: PostgrestReturningOptions = .minimal
 
     internal init(builder: io.github.jan.supabase.postgrest.query.PostgrestQueryBuilder) {
         self.builder = builder
@@ -248,7 +308,7 @@ public class PostgrestQueryBuilder {
         synchronized(self) {
             self.operation = operation
         }
-        return PostgrestFilterBuilder(queryBuilder: self)
+        return PostgrestFilterBuilder(executor: self)
     }
 
     public func delete() -> PostgrestFilterBuilder {
@@ -265,7 +325,8 @@ public class PostgrestQueryBuilder {
     }
 
     public func insert(value: Any, returning: PostgrestReturningOptions = .minimal) -> PostgrestFilterBuilder {
-        createFilterBuilder(operation: .insert(value))
+        self.returning = returning
+        return createFilterBuilder(operation: .insert(value))
     }
 
     public func upsert(value: Any) -> PostgrestFilterBuilder {
@@ -276,35 +337,66 @@ public class PostgrestQueryBuilder {
         case select, delete, insert(Any), update(Any), upsert(Any)
     }
 
+    public override func execute(requestBuilder: (io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> ()) async -> io.github.jan.supabase.postgrest.result.PostgrestResult {
+        let rb: (io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> () = { x in
+            // x.returning = self.returning.kt // Cannot access 'returning': it is private in 'io/github/jan/supabase/postgrest/query/PostgrestRequestBuilder'.
+
+            // since we can't manually set the returning value, go through a function that does it as a side-effect
+            if self.returning == .representation {
+                x.select(columns: Columns.ALL)
+            }
+            requestBuilder(x)
+        }
+
+        switch self.operation {
+        case .select:
+            return builder.select(request: rb)
+        case .delete:
+            return builder.delete(request: rb)
+        case .insert(let x):
+            return builder.insert(value: x, request: rb)
+        case .update(let x):
+            return builder.update(value: x, request: rb)
+        case .upsert(let x):
+            return builder.upsert(value: x, request: rb)
+        }
+    }
+
 }
 
 public class PostgrestBuilder {
-    fileprivate let queryBuilder: PostgrestQueryBuilder
+    // SKIP INSERT: @PublishedApi
+    fileprivate let executor: PostgrestExecutor
 
-    init(queryBuilder: PostgrestQueryBuilder) {
-        self.queryBuilder = queryBuilder
+    init(executor: PostgrestExecutor) {
+        self.executor = executor
     }
 
-    public func execute() async -> PostgrestResponse<Void> {
-        execute(options: nil)
+    // TODO: also handle direct Decodable argument, but we need to disambiguate somehow
+//    @inline(__always) public func execute<T: Decodable>(options: FetchOptions? = nil) async -> PostgrestResponse<T> {
+//        // TODO: handle options
+//        let result: io.github.jan.supabase.postgrest.result.PostgrestResult = self.executor.execute(requestBuilder: buildRequest())
+//        let data = result.data.data(using: String.Encoding.utf8)! // the SupabaseKt data is actually a String
+//        let value = try JSONDecoder().decode(T.self, from: data)
+//        return PostgrestResponse<T>(result: result, data: data, value: value)
+//    }
+
+    @inline(__always) public func execute<T: Decodable>(options: FetchOptions? = nil) async -> PostgrestResponse<[T]> {
+        // TODO: handle options
+        let result: io.github.jan.supabase.postgrest.result.PostgrestResult = self.executor.execute(requestBuilder: buildRequest())
+        let data = result.data.data(using: String.Encoding.utf8)! // the SupabaseKt data is actually a String
+        let value = try JSONDecoder().decode([T].self, from: data)
+        return PostgrestResponse<[T]>(result: result, data: data, value: value)
     }
 
-    public func execute<T>(options: FetchOptions? = nil, void: Void? = nil) async -> PostgrestResponse<T> {
-        switch queryBuilder.operation {
-        case .select:
-            return PostgrestResponse(result: queryBuilder.builder.select(request: buildRequest()))
-        case .delete:
-            return PostgrestResponse(result: queryBuilder.builder.delete(request: buildRequest()))
-        case .insert(let x):
-            return PostgrestResponse(result: queryBuilder.builder.insert(value: x, request: buildRequest()))
-        case .update(let x):
-            return PostgrestResponse(result: queryBuilder.builder.update(value: x, request: buildRequest()))
-        case .upsert(let x):
-            return PostgrestResponse(result: queryBuilder.builder.upsert(value: x, request: buildRequest()))
-        }
-
+    @inline(__always) public func execute(_ v1: Void? = nil) async -> PostgrestResponse<Void> {
+        // TODO: handle options
+        let result: io.github.jan.supabase.postgrest.result.PostgrestResult = self.executor.execute(requestBuilder: buildRequest())
+        let data = result.data.data(using: String.Encoding.utf8)! // the SupabaseKt data is actually a String
+        return PostgrestResponse<Void>(result: result, data: data, value: Void)
     }
 
+    // SKIP INSERT: @PublishedApi
     func buildRequest() -> (io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> () {
         { _ in
         }
@@ -492,33 +584,30 @@ public class PostgrestFilterBuilder : PostgrestTransformBuilder {
             }
         }
     }
-
 }
 
 public struct PostgrestResponse<T> {
     private let result: io.github.jan.supabase.postgrest.result.PostgrestResult
+    public let data: Data
+    public let value: T
 
-    init(result: io.github.jan.supabase.postgrest.result.PostgrestResult) {
+    // SKIP INSERT: @PublishedApi
+    init(result: io.github.jan.supabase.postgrest.result.PostgrestResult, data: Data, value: T) {
         self.result = result
+        self.data = data
+        self.value = value
     }
 
     public var count: Int? {
-        result.countOrNull()?.toInt()
+        return result.countOrNull()?.toInt()
     }
 
-    public var value: T! {
-        nil // TODO
+    public var status: Int {
+        let headers: io.ktor.http.Headers = result.headers
+        // default headers does not seem to contain a "status" key, so fall back to 200 (success)
+        // [alt-svc, cf-cache-status, cf-ray, content-profile, content-range, content-type, date, sb-gateway-version, sb-project-ref, server, strict-transport-security, vary, x-content-type-options, x-envoy-attempt-count, x-envoy-upstream-service-time]
+        return headers["status"]?.split(" ")?.drop(1).firstOrNull()?.toIntOrNull() ?? 200
     }
-
-
-    //public let data: Data
-    //public let response: HTTPURLResponse
-    //public let count: Int?
-    //public let value: T
-
-//    public var status: Int {
-//        response.statusCode
-//    }
 }
 
 
@@ -556,6 +645,13 @@ public enum PostgrestReturningOptions: String, Sendable {
     case minimal
     /// Returns a copy of the updated data.
     case representation
+
+    var kt: io.github.jan.supabase.postgrest.query.Returning {
+        switch self {
+        case .minimal: return .Minimal
+        case .representation: return .Representation()
+        }
+    }
 }
 
 /// The type of tsquery conversion to use on query.

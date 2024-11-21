@@ -9,9 +9,9 @@ settings:
           contents:
             - block: 'create("libs")'
               contents:
-                - 'version("supabase", "3.0.1")'
+                - 'version("supabase", "3.0.2")'
                 - 'library("supabase-bom", "io.github.jan-tennert.supabase", "bom").versionRef("supabase")'
-                - 'version("ktor-client-okhttp-version", "3.0.0")'
+                - 'version("ktor-client-okhttp-version", "3.0.1")'
                 - 'library("ktor-client-okhttp", "io.ktor", "ktor-client-okhttp").versionRef("ktor-client-okhttp-version")'
 
 build:
