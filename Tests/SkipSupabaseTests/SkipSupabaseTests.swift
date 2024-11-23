@@ -187,8 +187,8 @@ final class SkipSupabaseTests: XCTestCase {
         // SKIP NOWARN
         let rpc1: PostgrestResponse<Void> = try await client
             .rpc("rpc_test_with_param", params: [
-                "testParam1": "testValue",
-                "testParam2": "1"
+                "testparam1": "testValue",
+                "testparam2": "1"
             ])
             .execute()
 
