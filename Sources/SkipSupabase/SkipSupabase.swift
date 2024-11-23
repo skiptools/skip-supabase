@@ -80,7 +80,7 @@ public class SupabaseClient {
         return PostgrestRpcBuilder(fname: fn, client: client, params: nil).createFilterBuilder()
     }
 
-    public func rpc(_ fn: String, params: Dictionary<String, Any>) async -> PostgrestFilterBuilder {
+    public func rpc(_ fn: String, params: Dictionary<String, String>) async -> PostgrestFilterBuilder {
         return PostgrestRpcBuilder(fname: fn, client: client, params: params).createFilterBuilder()
     }
 }
@@ -280,9 +280,9 @@ public protocol PostgrestExecutor {
 public final class PostgrestRpcBuilder: PostgrestExecutor {
     private let fname: String
     private let client: io.github.jan.supabase.SupabaseClient
-    private let params: Dictionary<String, Any>?
+    private let params: Dictionary<String, String>?
 
-    init(fname: String, client: io.github.jan.supabase.SupabaseClient, params: Dictionary<String, Any>? = nil) {
+    init(fname: String, client: io.github.jan.supabase.SupabaseClient, params: Dictionary<String, String>? = nil) {
         self.fname = fname
         self.client = client
         self.params = params
@@ -301,9 +301,7 @@ public final class PostgrestRpcBuilder: PostgrestExecutor {
         // val jsonMap = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
         
         for key in params.keys {
-            let value = params[key]
-            let stringValue: String = "\(value)"
-            let jsonElement = kotlinx.serialization.json.Json.parseToJsonElement(stringValue)
+            let jsonElement = kotlinx.serialization.json.Json.parseToJsonElement("\(params[key])")
             // SKIP INSERT:
             // jsonMap.put(key , jsonElement)
         }
