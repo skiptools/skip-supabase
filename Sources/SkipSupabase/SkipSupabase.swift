@@ -301,7 +301,7 @@ public final class PostgrestRpcBuilder: PostgrestExecutor {
         
         for key in params.keys {
             let jsonElement = kotlinx.serialization.json.Json.parseToJsonElement("\(params[key])")
-            jsonMap.put(key , jsonElement)
+            jsonMap.put(key, jsonElement)
         }
         
         let rpcParams = kotlinx.serialization.json.JsonObject(jsonMap)
