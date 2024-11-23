@@ -297,13 +297,11 @@ public final class PostgrestRpcBuilder: PostgrestExecutor {
             return await self.client.postgrest.rpc(fname)
         }
         
-        // SKIP INSERT:
-        // val jsonMap = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+        let jsonMap = kotlin.collections.mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
         
         for key in params.keys {
             let jsonElement = kotlinx.serialization.json.Json.parseToJsonElement("\(params[key])")
-            // SKIP INSERT:
-            // jsonMap.put(key , jsonElement)
+            jsonMap.put(key , jsonElement)
         }
         
         let rpcParams = kotlinx.serialization.json.JsonObject(jsonMap)
