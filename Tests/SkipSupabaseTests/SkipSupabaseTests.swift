@@ -175,5 +175,22 @@ final class SkipSupabaseTests: XCTestCase {
 //            .execute()
 //            .value
     }
+    
+    // TODO: Prepare rpc function for testing in supabase
+    func testSkipSupabaseRPCWithParams() async throws {
+        // SKIP NOWARN
+        let rpc1: PostgrestResponse<Void> = try await client
+            .rpc("rpc_test_with_param", params: [
+                "testParam1": "testValue",
+                "testParam2": "1"
+            ])
+            .execute()
+
+        XCTAssertEqual(rpc1.status, 200)
+        XCTAssertEqual(String(data: rpc1.data, encoding: .utf8), "\"Hello Supabase RPC With Param\"")
+
+        let value1: Void = rpc1.value
+
+    }
 
 }
