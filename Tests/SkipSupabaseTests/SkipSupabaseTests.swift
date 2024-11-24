@@ -177,11 +177,9 @@ final class SkipSupabaseTests: XCTestCase {
     }
     
     /* Created with:
-      CREATE OR REPLACE FUNCTION public.rpc_test_with_param(testParam1 text, testParam2 text) returns text as $$
-      BEGIN
+        CREATE OR REPLACE FUNCTION public.rpc_test_with_param(testParam1 text, testParam2 text) returns text as $$
         select 'Hello Supabase RPC With Param: ' || testParam1 || testParam2;
-      END;
-      $$ LANGUAGE plpgsql VOLATILE;
+        $$ LANGUAGE sql;
      */
     func testSkipSupabaseRPCWithParams() async throws {
         // SKIP NOWARN
