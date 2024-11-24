@@ -3,6 +3,7 @@
 // as published by the Free Software Foundation https://fsf.org
 
 import Foundation
+
 #if !SKIP
 @_exported import Supabase
 #else
@@ -76,12 +77,11 @@ public class SupabaseClient {
     }
 
     @inline(__always) public func rpc(_ fn: String) async -> PostgrestFilterBuilder {
-        return PostgrestRpcBuilder(fname: fn, client: client).createFilterBuilder()
+        return PostgrestRpcBuilder(fname: fn, client: client, params: nil).createFilterBuilder()
     }
 
-    @inline(__always) public func rpc<T: Encodable>(_ fn: String, params: T) async -> PostgrestFilterBuilder {
-        fatalError("TODO: rpc with parameters")
-        //return PostgrestRpcBuilder(fname: fn, client: client).createFilterBuilder()
+    public func rpc(_ fn: String, params: Dictionary<String, String>) async -> PostgrestFilterBuilder {
+        return PostgrestRpcBuilder(fname: fn, client: client, params: params).createFilterBuilder()
     }
 }
 
@@ -280,10 +280,12 @@ public protocol PostgrestExecutor {
 public final class PostgrestRpcBuilder: PostgrestExecutor {
     private let fname: String
     private let client: io.github.jan.supabase.SupabaseClient
+    private let params: Dictionary<String, String>?
 
-    init(fname: String, client: io.github.jan.supabase.SupabaseClient) {
+    init(fname: String, client: io.github.jan.supabase.SupabaseClient, params: Dictionary<String, String>? = nil) {
         self.fname = fname
         self.client = client
+        self.params = params
     }
 
     func createFilterBuilder() -> PostgrestFilterBuilder {
@@ -291,8 +293,21 @@ public final class PostgrestRpcBuilder: PostgrestExecutor {
     }
 
     public override func execute(requestBuilder: (io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> ()) async -> io.github.jan.supabase.postgrest.result.PostgrestResult {
-        return await self.client.postgrest.rpc(fname)
+        guard let params = self.params else {
+            return await self.client.postgrest.rpc(fname)
+        }
+        
+        let jsonMap = kotlin.collections.mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+        
+        for key in params.keys {
+            let jsonElement = kotlinx.serialization.json.Json.parseToJsonElement("\(params[key])")
+            jsonMap.put(key, jsonElement)
+        }
+        
+        let rpcParams = kotlinx.serialization.json.JsonObject(jsonMap)
+        return await self.client.postgrest.rpc(fname, rpcParams)
     }
+    
 }
 
 public final class PostgrestQueryBuilder : PostgrestExecutor {
