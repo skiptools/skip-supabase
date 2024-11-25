@@ -1,30 +1,21 @@
 # SkipSupabase
 
-This is a free [Skip](https://skip.tools) Swift/Kotlin library project containing the following modules:
+This package provides Supabase support for Skip app/framework projects.
+The Swift side uses the official Supabase iOS SDK directly,
+with the various `SkipSupabase*` modules passing the transpiled calls
+through to the community Supabase Android SDK.
 
-SkipSupabase
-SkipSupabaseAuth
-SkipSupabaseFunctions
-SkipSupabasePostgREST
-SkipSupabaseRealtime
-SkipSupabaseStorage
+For an example of using Supabase in a Skip app, see the
+[SupaTODO Sample](https://github.com/skiptools/skipapp-supatodo/).
 
-## Building
+## Package
 
-This project is a free Swift Package Manager module that uses the
-[Skip](https://skip.tools) plugin to transpile Swift into Kotlin.
+The modules in the SkipSupabase framework project mirror the division of the SwiftPM
+modules in the Supabase iOS SDK (at [http://github.com/supabase/supabase-swift](http://github.com/supabase/supabase-swift)),
+which is generally mirrored in the division of the Supabase Kotlin Android gradle modules (at [https://github.com/supabase-community/supabase-kt](https://github.com/supabase-community/supabase-kt)).
 
-Building the module requires that Skip be installed using 
-[Homebrew](https://brew.sh) with `brew install skiptools/skip/skip`.
-This will also install the necessary build prerequisites:
-Kotlin, Gradle, and the Android build tools.
+## Status
 
-## Testing
-
-The module can be tested using the standard `swift test` command
-or by running the test target for the macOS destination in Xcode,
-which will run the Swift tests as well as the transpiled
-Kotlin JUnit tests in the Robolectric Android simulation environment.
-
-Parity testing can be performed with `skip test`,
-which will output a table of the test results for both platforms.
+This project is in a very early stage, but some amount of Auth and Database API is implemented.
+For examples of what is working, see the [SkipSupabaseTests.swift](https://github.com/skiptools/skip-supabase/blob/main/Tests/SkipSupabaseTests/SkipSupabaseTests.swift)
+test case, which also shows how setup can be performed.
