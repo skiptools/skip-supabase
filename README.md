@@ -19,3 +19,8 @@ which is generally mirrored in the division of the Supabase Kotlin Android gradl
 This project is in a very early stage, but some amount of Auth and Database API is implemented.
 For examples of what is working, see the [SkipSupabaseTests.swift](https://github.com/skiptools/skip-supabase/blob/main/Tests/SkipSupabaseTests/SkipSupabaseTests.swift)
 test case, which also shows how setup can be performed.
+
+Please file an [issue](https://github.com/skiptools/skip-supabase/issues)
+if there is a particular API that you need for you project, or if something isn't working right.
+And please consider contributing to this project by filing
+[pull requests](https://github.com/skiptools/skip-supabase/pulls).
