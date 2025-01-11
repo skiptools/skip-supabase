@@ -1,3 +1,12 @@
+## 0.1.0
+
+Released 2025-01-11
+
+  - Fix encoding/decoding Date properties (#13)
+  - Add more README
+  - Add basic docs in README
+  - Enable run-export in CI
+
 ## 0.0.5
 
 Released 2024-11-23
