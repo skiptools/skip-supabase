@@ -10,8 +10,10 @@ import Foundation
 let logger: Logger = Logger(subsystem: "SkipSupabase", category: "Tests")
 
 struct Country: Codable {
-  let id: Int
-  let name: String
+    var id: Int
+    var name: String
+    var created: Date? = nil
+    var gdp: Decimal? = nil
 }
 
 
@@ -70,14 +72,17 @@ final class SkipSupabaseTests: XCTestCase {
         logger.log("running testSkipSupabase")
 
         // clear the countries table
+        // SKIP NOWARN
         let voidResponse: PostgrestResponse<Void> = try await client
             .from("countries")
             .delete()
             .gte("id", value: 0)
             .execute()
+        let _ = voidResponse
 
         func assertCount(_ table: String, count: Int) async throws {
             // count query
+            // SKIP NOWARN
             let countryCount0: PostgrestResponse<Void> = try await client
                 .from(table)
                 .select(count: CountOption.exact)
@@ -87,32 +92,33 @@ final class SkipSupabaseTests: XCTestCase {
 
         try await assertCount("countries", count: 0)
 
-        // insert single
-        let icountryResponse: PostgrestResponse<[Country]> = try await client
-            .from("countries")
-            .insert(Country(id: 1, name: "USA"), returning: PostgrestReturningOptions.representation)
-            // .single() // TODO: handle single results
-            .execute(options: FetchOptions(head: false, count: CountOption.exact))
+        let now = Date()
 
+        @discardableResult func insert(country: Country) async throws -> Country? {
+            // SKIP NOWARN
+            let results: PostgrestResponse<[Country]> = try await client
+                .from("countries")
+                .insert(country, returning: PostgrestReturningOptions.representation)
+                .execute(options: FetchOptions(head: false, count: CountOption.exact))
+            return results.value.first
+        }
+
+        try await assertCount("countries", count: 0)
+        let icountry = try await insert(country: Country(id: 1, name: "USA"))
         try await assertCount("countries", count: 1)
 
-        let icountry: [Country] = icountryResponse.value
-        XCTAssertEqual(1, icountry.first?.id)
+        var country1 = try XCTUnwrap(icountry)
 
-        #if !SKIP
+        XCTAssertEqual(1, country1.id)
+        let country1Created = try XCTUnwrap(country1.created)
+        XCTAssertGreaterThanOrEqual(country1Created, now)
 
-        // FIXME Kotlin: SkipSupabase.kt:900 testSkipModule(): java.lang.IllegalArgumentException: Element class kotlinx.serialization.json.JsonArray is not a JsonObject
-
-        // insert array
-        try await client
-            .from("countries")
-            .insert([
-                Country(id: 2, name: "France"),
-                Country(id: 3, name: "Germany"),
-            ])
-            .execute()
+        try await insert(country: Country(id: 2, name: "France"))
+        try await insert(country: Country(id: 3, name: "Germany"))
+        try await assertCount("countries", count: 3)
 
         // count query
+        // SKIP NOWARN
         let countryCount = try await client
             .from("countries")
             .select(count: .exact)
@@ -120,43 +126,69 @@ final class SkipSupabaseTests: XCTestCase {
 
         XCTAssertEqual(3, countryCount.count)
 
-
         // query single row
-        let countries: [Country] = try await client
+        let countriesResp: PostgrestResponse<[Country]> = try await client
           .from("countries")
           .select()
           .order("id")
           .limit(1)
-          .execute()
-          .value
+          .execute(options: FetchOptions(head: false, count: CountOption.exact))
+        let countries = countriesResp.value
 
+        //XCTAssertEqual(1, countriesResp.count)
         XCTAssertEqual("USA", countries.first?.name)
 
         // update
+        country1.name = "Australia"
+        country1.gdp = Decimal(123.456)
+
+        // SKIP NOWARN
         try await client
           .from("countries")
-          .update(["name": "Australia"])
+          //.update(["name": "Australia"]) // java.lang.ClassCastException: class skip.lib.Tuple2 cannot be cast to class skip.lib.Encodable
+          .update(country1)
           .eq("id", value: 1)
           .execute()
 
         // verify query
-        let countries2: [Country] = try await client
+        let countries2Resp: PostgrestResponse<[Country]> = try await client
           .from("countries")
           .select()
-          .order("id")
-          .execute()
-          .value
+          .order("id", ascending: false)
+          .execute(options: FetchOptions(head: false, count: CountOption.exact))
 
-        XCTAssertEqual("Australia", countries2.first?.name)
+        let countries2 = countries2Resp.value
+
+        XCTAssertEqual("Australia", countries2.last?.name)
+
+        @MainActor func assertQueryCount(_ count: Int, _ block: (PostgrestFilterBuilder) -> (PostgrestFilterBuilder)) async throws {
+            let q: PostgrestFilterBuilder = block(client.from("countries").select())
+            let response: PostgrestResponse<[Country]> = try await q.execute(options: FetchOptions(head: false, count: CountOption.exact))
+            XCTAssertEqual(count, response.value.count, "value mismatch for \(q): \(count) vs. \(response.value.count)")
+        }
+
+        try await assertQueryCount(3, { $0 })
+        try await assertQueryCount(1, { $0.eq("id", value: 1) })
+        try await assertQueryCount(0, { $0.eq("id", value: 999) })
+        try await assertQueryCount(1, { $0.eq("id", value: 1) })
+        try await assertQueryCount(2, { $0.gt("id", value: 1) })
+        try await assertQueryCount(3, { $0.gte("id", value: 1) })
+        try await assertQueryCount(1, { $0.lt("id", value: 2) })
+        try await assertQueryCount(3, { $0.lte("id", value: 3) })
+        try await assertQueryCount(1, { $0.lte("name", value: "Australia") })
+        try await assertQueryCount(3, { $0.gte("name", value: "Australia") })
+        try await assertQueryCount(2, { $0.in("name", values: ["Germany", "France", "XXX"]) })
+        try await assertQueryCount(1, { $0.gte("gdp", value: 123) })
+        //try await assertQueryCount(0, { $0.contains("name", value: ["XXX"]) })
+        //try await assertQueryCount(0, { $0.containedBy("name", value: ["XXX"]) })
 
         // clear the countries table
-        try await client
-            .from("countries")
-            .delete()
-            .gte("id", value: 0)
-            .execute()
-
-        #endif
+//        // SKIP NOWARN
+//        try await client
+//            .from("countries")
+//            .delete()
+//            .gte("id", value: 0)
+//            .execute()
     }
 
     func testSkipSupabaseRPC() async throws {
@@ -169,6 +201,7 @@ final class SkipSupabaseTests: XCTestCase {
         XCTAssertEqual(String(data: rpc1.data, encoding: .utf8), "\"Hello Supabase RPC\"")
 
         let value1: Void = rpc1.value
+        let _ = value1
 
 //        let rpc2: Void = try await client
 //            .rpc("rpc_test_params", params: Country(id: 2, name: "France"))
@@ -194,7 +227,6 @@ final class SkipSupabaseTests: XCTestCase {
         XCTAssertEqual(String(data: rpc1.data, encoding: .utf8), "\"Hello Supabase RPC With Param: testValue1\"")
 
         let value1: Void = rpc1.value
-
+        let _ = value1
     }
-
 }

@@ -24,6 +24,7 @@ import io.github.jan.supabase.postgrest.rpc
 
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.query.Order
 
 import io.github.jan.supabase.SupabaseSerializer
 import kotlinx.serialization.json.Json
@@ -107,6 +108,7 @@ public class AuthClient {
     }
 
     public func signIn(email: String, password: String, captchaToken: String? = nil) async throws {
+        // SKIP NOWARN
         try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.Email) {
             self.email = email
             self.password = password
@@ -115,6 +117,7 @@ public class AuthClient {
     }
 
     public func signUp(email: String, password: String) async throws {
+        // SKIP NOWARN
         try await auth.signUpWith(io.github.jan.supabase.auth.providers.builtin.Email) {
             self.email = email
             self.password = password
@@ -122,6 +125,7 @@ public class AuthClient {
     }
 
     public func signIn(phone: String, password: String, captchaToken: String? = nil) async throws {
+        // SKIP NOWARN
         try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.Phone) {
             self.phone = phone
             self.password = password
@@ -130,10 +134,12 @@ public class AuthClient {
     }
 
     public func signInAnonymously(data: [String: AnyJSON]? = nil, captchaToken: String? = nil) async throws {
+        // SKIP NOWARN
         try await auth.signInAnonymously(data: dict2JsonObject(data), captchaToken: captchaToken)
     }
 
     public func signOut(scope: SignOutScope = .global) async throws {
+        // SKIP NOWARN
         try await auth.signOut(scope.kotlinScope)
     }
 }
@@ -242,6 +248,9 @@ class CodableSerializer: io.github.jan.supabase.SupabaseSerializer {
         }
 
         let encoder = JSONEncoder()
+        encoder.dataEncodingStrategy = .base64
+        encoder.dateEncodingStrategy = .formatted(_createSupabaseDateFormatter(forDecoding: false))
+
         let data = try encoder.encode(v)
         return String(data: data, encoding: String.Encoding.utf8)!
     }
@@ -294,6 +303,7 @@ public final class PostgrestRpcBuilder: PostgrestExecutor {
 
     public override func execute(requestBuilder: (io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> ()) async -> io.github.jan.supabase.postgrest.result.PostgrestResult {
         guard let params = self.params else {
+            // SKIP NOWARN
             return await self.client.postgrest.rpc(fname)
         }
         
@@ -305,6 +315,7 @@ public final class PostgrestRpcBuilder: PostgrestExecutor {
         }
         
         let rpcParams = kotlinx.serialization.json.JsonObject(jsonMap)
+        // SKIP NOWARN
         return await self.client.postgrest.rpc(fname, rpcParams)
     }
     
@@ -379,6 +390,48 @@ public final class PostgrestQueryBuilder : PostgrestExecutor {
 
 }
 
+/// Create a DateFormatter to use for encoding and decoding dates from Supabase
+///
+/// - Note: must be public in order to be usable from `@inline(__always) public func execute`
+private func _createSupabaseDateFormatter(forDecoding: Bool, fractional: Bool = false) -> DateFormatter {
+    let fmt = ISO8601DateFormatter()
+    if fractional {
+        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    } else {
+        fmt.formatOptions = [.withInternetDateTime]
+    }
+    return fmt
+}
+
+private func _createSupabaseJSONDecoder() -> JSONDecoder {
+    let decoder = try JSONDecoder()
+    decoder.dataDecodingStrategy = .base64
+    // Supabase transmits dates with either fractional or non-fractional seconds
+    // https://github.com/supabase/supabase-swift/blob/main/Sources/Helpers/AnyJSON/AnyJSON%2BCodable.swift
+
+    let fmt1 = _createSupabaseDateFormatter(forDecoding: true, fractional: true)
+    let fmt2 = _createSupabaseDateFormatter(forDecoding: true, fractional: false)
+
+    let decodeDate = { (decoder: Decoder) throws -> Date in
+        let container = try decoder.singleValueContainer()
+        let dateString = try container.decode(String.self)
+
+        let date = fmt1.date(from: dateString) ?? fmt2.date(from: dateString)
+
+        guard let decodedDate = date else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date format: \(dateString)")
+        }
+
+        return decodedDate
+    }
+
+    decoder.dateDecodingStrategy = .custom(decodeDate)
+    return decoder
+}
+
+public let _supabaseJSONDecoder = _createSupabaseJSONDecoder()
+
+
 public class PostgrestBuilder {
     // SKIP INSERT: @PublishedApi
     fileprivate let executor: PostgrestExecutor
@@ -387,7 +440,7 @@ public class PostgrestBuilder {
         self.executor = executor
     }
 
-    // TODO: also handle direct Decodable argument, but we need to disambiguate somehow
+    // TODO: also handle single Decodable argument, but we cannot disambiguate between them based solely on return type
 //    @inline(__always) public func execute<T: Decodable>(options: FetchOptions? = nil) async -> PostgrestResponse<T> {
 //        // TODO: handle options
 //        let result: io.github.jan.supabase.postgrest.result.PostgrestResult = self.executor.execute(requestBuilder: buildRequest())
@@ -400,7 +453,7 @@ public class PostgrestBuilder {
         // TODO: handle options
         let result: io.github.jan.supabase.postgrest.result.PostgrestResult = self.executor.execute(requestBuilder: buildRequest())
         let data = result.data.data(using: String.Encoding.utf8)! // the SupabaseKt data is actually a String
-        let value = try JSONDecoder().decode([T].self, from: data)
+        let value = _supabaseJSONDecoder.decode([T].self, from: data)
         return PostgrestResponse<[T]>(result: result, data: data, value: value)
     }
 
@@ -419,13 +472,7 @@ public class PostgrestBuilder {
 }
 
 public class PostgrestTransformBuilder : PostgrestBuilder {
-    /// Perform a SELECT on the query result.
-    ///
-    /// By default, `.insert()`, `.update()`, `.upsert()`, and `.delete()` do not return modified rows. By calling this method, modified rows are returned in `value`.
-    ///
-    /// - Parameters:
-    ///   - columns: The columns to retrieve, separated by commas.
-//    public func select(_ columns: String = "*") -> PostgrestTransformBuilder
+    fileprivate var transforms: [(io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> ()] = []
 
     /// Order the query result by `column`.
     ///
@@ -437,18 +484,27 @@ public class PostgrestTransformBuilder : PostgrestBuilder {
     ///   - ascending: If `true`, the result will be in ascending order.
     ///   - nullsFirst: If `true`, `null`s appear first. If `false`, `null`s appear last.
     ///   - referencedTable: Set this to order a referenced table by its columns.
-//    public func order(
-//      _ column: String,
-//      ascending: Bool = true,
-//      nullsFirst: Bool = false,
-//      referencedTable: String? = nil
-//    ) -> PostgrestTransformBuilder
+    public func order(_ column: String, ascending: Bool = true, nullsFirst: Bool = false, referencedTable: String? = nil) -> PostgrestTransformBuilder {
+        synchronized(self) {
+            transforms.append { builder in
+                builder.order(column: column, order: ascending ? Order.ASCENDING : Order.DESCENDING, nullsFirst: nullsFirst, referencedTable: referencedTable)
+            }
+        }
+        return self
+    }
 
     /// Limits the query result by `count`.
     /// - Parameters:
     ///   - count: The maximum number of rows to return.
     ///   - referencedTable: Set this to limit rows of referenced tables instead of the parent table.
-//    public func limit(_ count: Int, referencedTable: String? = nil) -> PostgrestTransformBuilder
+    public func limit(_ count: Int, referencedTable: String? = nil) -> PostgrestTransformBuilder {
+        synchronized(self) {
+            transforms.append { builder in
+                builder.limit(count: Long(count), referencedTable: referencedTable)
+            }
+        }
+        return self
+    }
 
     /// Limit the query result by starting at an offset (`from`) and ending at the offset (`from + to`).
     ///
@@ -460,11 +516,14 @@ public class PostgrestTransformBuilder : PostgrestBuilder {
     ///   - from: The starting index from which to limit the result.
     ///   - to: The last index to which to limit the result.
     ///   - referencedTable: Set this to limit rows of referenced tables instead of the parent table.
-//    public func range(
-//      from: Int,
-//      to: Int,
-//      referencedTable: String? = nil
-//    ) -> PostgrestTransformBuilder
+    public func range(from: Int, to: Int, referencedTable: String? = nil) -> PostgrestTransformBuilder {
+        synchronized(self) {
+            transforms.append { builder in
+                builder.range(from: Long(from), to: Long(to), referencedTable: referencedTable)
+            }
+        }
+        return self
+    }
 
     /// Return `value` as a single object instead of an array of objects.
     ///
@@ -474,10 +533,16 @@ public class PostgrestTransformBuilder : PostgrestBuilder {
     }
 
     ///  Return `value` as a string in CSV format.
-//    public func csv() -> PostgrestTransformBuilder
+    @available(*, unavailable)
+    public func csv() -> PostgrestTransformBuilder {
+        self
+    }
 
     /// Return `value` as an object in [GeoJSON](https://geojson.org) format.
-//    public func geojson() -> PostgrestTransformBuilder
+    @available(*, unavailable)
+    public func geojson() -> PostgrestTransformBuilder {
+        self
+    }
 
     /// Return `data` as the EXPLAIN plan for the query.
     ///
@@ -493,19 +558,13 @@ public class PostgrestTransformBuilder : PostgrestBuilder {
     ///   - buffers: If `true`, include information on buffer usage
     ///   - wal: If `true`, include information on WAL record generation
     ///   - format: The format of the output, can be `"text"` (default) or `"json"`
-//    public func explain(
-//      analyze: Bool = false,
-//      verbose: Bool = false,
-//      settings: Bool = false,
-//      buffers: Bool = false,
-//      wal: Bool = false,
-//      format: String = "text"
-//    ) -> PostgrestTransformBuilder
-
+    @available(*, unavailable)
+    public func explain(analyze: Bool = false, verbose: Bool = false, settings: Bool = false, buffers: Bool = false, wal: Bool = false, format: String = "text") -> PostgrestTransformBuilder {
+        self
+    }
 }
 
 public class PostgrestFilterBuilder : PostgrestTransformBuilder {
-    //private var requests: [(io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder) -> ()] = []
     fileprivate var filters: [(io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder) -> ()] = []
     fileprivate var countOption: CountOption? = nil
 
@@ -515,63 +574,65 @@ public class PostgrestFilterBuilder : PostgrestTransformBuilder {
     }
 
     public func eq(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        filter({ $0.eq(columnName, value) })
+        filter({ $0.eq(column: columnName, value: value) })
     }
 
     public func neq(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        filter({ $0.neq(columnName, value) })
+        filter({ $0.neq(column: columnName, value: value) })
     }
 
     public func gt(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        filter({ $0.gt(columnName, value) })
+        filter({ $0.gt(columnName, value: value) })
     }
 
     public func gte(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        filter({ $0.gte(columnName, value) })
+        filter({ $0.gte(column: columnName, value: value) })
     }
 
     public func lt(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        filter({ $0.lt(columnName, value) })
+        filter({ $0.lt(column: columnName, value: value) })
     }
 
     public func lte(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        filter({ $0.lte(columnName, value) })
+        filter({ $0.lte(column: columnName, value: value) })
     }
 
-//    public func containedBy(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-//        filter({ $0.containedBy(columnName, value) })
-//    }
+    public func containedBy(_ columnName: String, _ value: [Any]) -> PostgrestFilterBuilder {
+        filter({ $0.contained(column: columnName, values: value.toList()) })
+    }
 
-//    public func `in`(_ columnName: String, _ value: [Any]) -> PostgrestFilterBuilder {
-//        filter({ $0.in(columnName, value) })
-//    }
+    public func `in`(_ columnName: String, _ values: [Any]) -> PostgrestFilterBuilder {
+        filter({ $0.isIn(column: columnName, values: values.toList()) })
+    }
 
     public func contains(_ columnName: String, _ value: [Any]) -> PostgrestFilterBuilder {
-        filter({ $0.contains(columnName, value.toList()) })
+        filter({ $0.contains(column: columnName, values: value.toList()) })
     }
 
     public func equals(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        filter({ $0.eq(columnName, value) })
+        filter({ $0.eq(column: columnName, value: value) })
     }
 
-//    public func fts(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-//        filter({ $0.fts(columnName, value) })
-//    }
+    @available(*, unavailable)
+    public func fts(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
+        //filter({ $0.fts(column: columnName, value: value) })
+        self
+    }
 
     public func greaterThan(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        filter({ $0.gt(columnName, value) })
+        filter({ $0.gt(column: columnName, value: value) })
     }
 
     public func greaterThanOrEquals(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        filter({ $0.gte(columnName, value) })
+        filter({ $0.gte(column: columnName, value: value) })
     }
 
     public func lowerThan(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        filter({ $0.lt(columnName, value) })
+        filter({ $0.lt(column: columnName, value: value) })
     }
 
     public func lowerThanOrEquals(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        filter({ $0.lte(columnName, value) })
+        filter({ $0.lte(column: columnName, value: value) })
     }
 
     /// Adds the given filter operation to the list of filters that will be applied when the request is built
@@ -587,6 +648,13 @@ public class PostgrestFilterBuilder : PostgrestTransformBuilder {
                     for filter in filters {
                         filter(self)
                     }
+                }
+            }
+
+            // order, limit, range, etc.
+            if !transforms.isEmpty {
+                for transform in transforms {
+                    transform(builder)
                 }
             }
 
