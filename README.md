@@ -5,8 +5,11 @@ The Swift side uses the official Supabase iOS SDK directly,
 with the various `SkipSupabase*` modules passing the transpiled calls
 through to the community Supabase Android SDK.
 
+The current Supabase API coverage is currently very limited.
 For an example of using Supabase in a Skip app, see the
-[SupaTODO Sample](https://github.com/skiptools/skipapp-supatodo/).
+[SupaTODO Sample](https://github.com/skiptools/skipapp-supatodo/),
+or browse the test cases at
+[SkipSupabaseTests.swift](https://github.com/skiptools/skip-supabase/blob/main/Tests/SkipSupabaseTests/SkipSupabaseTests.swift).
 
 ## Package
 
@@ -24,3 +27,18 @@ Please file an [issue](https://github.com/skiptools/skip-supabase/issues)
 if there is a particular API that you need for you project, or if something isn't working right.
 And please consider contributing to this project by filing
 [pull requests](https://github.com/skiptools/skip-supabase/pulls).
+
+### Implementation Details
+
+This package mimics the API shape of the
+[supabase-swift](http://github.com/supabase/supabase-swift)
+package by adapting it to the
+[supabase-kt](https://github.com/supabase-community/supabase-kt)
+project. Unlike other Skip API adaptations (like [Skip Firebase](https://github.com/skiptools/skip-firebase)),
+this is a challenging task because the Swift and Kotlin interfaces to Supabase
+were designed and implemented separately, and so their API shapes differ drastically.
+
+For an example of some of the gymnastics that are required to achieve the goal is a single unified API,
+see the implementation of
+[SkipSupabase.swift](https://github.com/skiptools/skip-supabase/blob/main/Sources/SkipSupabase/SkipSupabase.swift).
+
