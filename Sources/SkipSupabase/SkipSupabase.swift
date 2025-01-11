@@ -419,7 +419,7 @@ private func _createSupabaseJSONDecoder() -> JSONDecoder {
         let date = fmt1.date(from: dateString) ?? fmt2.date(from: dateString)
 
         guard let decodedDate = date else {
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date format: \(dateString)")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: container.codingPath, debugDescription: "Invalid date format: \(dateString)"))
         }
 
         return decodedDate
