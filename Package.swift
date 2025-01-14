@@ -23,8 +23,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://source.skip.tools/skip.git", from: "1.2.18"),
         .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.2.10"),
-        // cannot update to 2.24.2 due to https://github.com/supabase/supabase-swift/issues/636
-        .package(url: "https://github.com/supabase-community/supabase-swift.git", exact: "2.24.1")
+        .package(url: "https://github.com/supabase-community/supabase-swift.git", exact: "2.24.3")
     ],
     targets: [
         .target(name: "SkipSupabaseCore", dependencies: [
@@ -34,41 +33,41 @@ let package = Package(
             .product(name: "Auth", package: "supabase-swift"),
             "SkipSupabaseCore"
         ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
-        .testTarget(name: "SkipSupabaseAuthTests", dependencies: [
-            "SkipSupabaseAuth",
-            .product(name: "SkipTest", package: "skip")
-        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
+//        .testTarget(name: "SkipSupabaseAuthTests", dependencies: [
+//            "SkipSupabaseAuth",
+//            .product(name: "SkipTest", package: "skip")
+//        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
         .target(name: "SkipSupabaseFunctions", dependencies: [
             .product(name: "Functions", package: "supabase-swift"),
             "SkipSupabaseCore"
         ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
-        .testTarget(name: "SkipSupabaseFunctionsTests", dependencies: [
-            "SkipSupabaseFunctions", .product(name: "SkipTest", package: "skip")
-        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
+//        .testTarget(name: "SkipSupabaseFunctionsTests", dependencies: [
+//            "SkipSupabaseFunctions", .product(name: "SkipTest", package: "skip")
+//        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
         .target(name: "SkipSupabasePostgREST", dependencies: [
             .product(name: "PostgREST", package: "supabase-swift"),
             "SkipSupabaseCore"
         ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
-        .testTarget(name: "SkipSupabasePostgRESTTests", dependencies: [
-            "SkipSupabasePostgREST",
-            .product(name: "SkipTest", package: "skip")
-        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
+//        .testTarget(name: "SkipSupabasePostgRESTTests", dependencies: [
+//            "SkipSupabasePostgREST",
+//            .product(name: "SkipTest", package: "skip")
+//        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
         .target(name: "SkipSupabaseRealtime", dependencies: [
             .product(name: "Realtime", package: "supabase-swift"),
             "SkipSupabaseCore"
         ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
-        .testTarget(name: "SkipSupabaseRealtimeTests", dependencies: [
-            "SkipSupabaseRealtime",
-            .product(name: "SkipTest", package: "skip")
-        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
+//        .testTarget(name: "SkipSupabaseRealtimeTests", dependencies: [
+//            "SkipSupabaseRealtime",
+//            .product(name: "SkipTest", package: "skip")
+//        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
         .target(name: "SkipSupabaseStorage", dependencies: [
             .product(name: "Storage", package: "supabase-swift"),
             "SkipSupabaseCore"
         ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
-        .testTarget(name: "SkipSupabaseStorageTests", dependencies: [
-            "SkipSupabaseStorage",
-            .product(name: "SkipTest", package: "skip")
-        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
+//        .testTarget(name: "SkipSupabaseStorageTests", dependencies: [
+//            "SkipSupabaseStorage",
+//            .product(name: "SkipTest", package: "skip")
+//        ], resources: [.process("Resources")], plugins: [Target.PluginUsage.plugin(name: "skipstone", package: "skip")]),
         .target(name: "SkipSupabase", dependencies: [
             .product(name: "Supabase", package: "supabase-swift"),
             "SkipSupabaseAuth",

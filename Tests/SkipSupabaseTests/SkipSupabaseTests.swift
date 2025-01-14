@@ -25,11 +25,6 @@ fileprivate let client = SupabaseClient(
 
 final class SkipSupabaseTests: XCTestCase {
     func testSkipSupabaseAuth() async throws {
-
-        #if SKIP
-        //com.russhwolf.settings.Settings() // else: com.russhwolf.settings.NoArgKt.Settings(NoArg.kt:32)
-        #endif
-
         let ac: AuthClient = client.auth
         XCTAssertNil(ac.currentSession)
         XCTAssertNil(ac.currentSession?.user.email)
@@ -47,12 +42,6 @@ final class SkipSupabaseTests: XCTestCase {
             try await ac.signIn(phone: "", password: "", captchaToken: "")
             try await ac.signInAnonymously()
             try await ac.signInAnonymously(captchaToken: "")
-            //try await ac.signInAnonymously(data: ["key": .string("value")])
-
-            //try await ac.signInWithSSO(domain: <#T##String#>, redirectTo: <#T##URL?#>, captchaToken: <#T##String?#>)
-            //try await ac.signInWithOTP(phone: <#T##String#>, channel: <#T##MessagingChannel#>, shouldCreateUser: <#T##Bool#>, data: <#T##[String : AnyJSON]?#>, captchaToken: <#T##String?#>)
-            //try await ac.signInWithOTP(email: <#T##String#>, redirectTo: <#T##URL?#>, shouldCreateUser: <#T##Bool#>, data: <#T##[String : AnyJSON]?#>, captchaToken: <#T##String?#>)
-            //try await ac.signInWithOAuth(provider: <#T##Provider#>, redirectTo: <#T##URL?#>, scopes: <#T##String?#>, queryParams: <#T##[(name: String, value: String?)]#>, configure: <#T##(ASWebAuthenticationSession) -> Void##(ASWebAuthenticationSession) -> Void##(_ session: ASWebAuthenticationSession) -> Void#>)
 
 
             try await ac.signOut()
@@ -65,6 +54,29 @@ final class SkipSupabaseTests: XCTestCase {
             XCTFail("signIn should have failed")
         } catch {
             // expected
+        }
+
+        // check for unsupported API
+        // SKIP NOWARN
+        if false {
+            #if !SKIP
+            let signUpResponse1: AuthResponse = try await ac.signUp(email: "", password: "", data: [:], redirectTo: nil, captchaToken: "")
+            let signUpResponse2: AuthResponse = try await ac.signUp(phone: "", password: "", channel: MessagingChannel.whatsapp, data: [:], captchaToken: "")
+
+            let session1: Session = try await ac.exchangeCodeForSession(authCode: "")
+            let session2: Session = try await ac.setSession(accessToken: "", refreshToken: "")
+            let session3: Session = try await ac.refreshSession(refreshToken: "")
+
+            try await ac.signInAnonymously(data: ["key": .string("value")])
+
+            let ssoSession1 = try await ac.signInWithSSO(domain: "", redirectTo: nil, captchaToken: "")
+            let ssoSession2 = try await ac.signInWithSSO(providerId: "", redirectTo: nil, captchaToken: "")
+            try await ac.signInWithOTP(phone: "", channel: MessagingChannel.sms, shouldCreateUser: false, data: [:], captchaToken: "")
+            try await ac.signInWithOTP(email: "", redirectTo: nil, shouldCreateUser: false, data: [:], captchaToken: "")
+
+            try await ac.signInWithOAuth(provider: Provider.apple, redirectTo: nil, scopes: "", queryParams: [(name: "", value: "")]) { session in
+            }
+            #endif
         }
     }
 
@@ -228,5 +240,79 @@ final class SkipSupabaseTests: XCTestCase {
 
         let value1: Void = rpc1.value
         let _ = value1
+    }
+
+    func testSupabaseStorage() async throws {
+        // create a random path
+        let bucketName = "images"
+        let fileName = "tiny-\(UUID().uuidString).png"
+        let folder = "public"
+        let path = folder + "/" + fileName
+        let fileData = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mP4z8AAAAMBAQD3A0FDAAAAAElFTkSuQmCC")!
+
+        let storage: SupabaseStorageClient = client.storage
+
+        let buckets = try await storage.listBuckets()
+
+        let images: StorageFileApi = storage.from(bucketName)
+
+        let response1: FileUploadResponse = try await images
+            .upload(path, data: fileData, options: FileOptions(contentType: "image/png"))
+        XCTAssertEqual(path, response1.path)
+        XCTAssertEqual(bucketName + "/" + path, response1.fullPath)
+
+        let topts = TransformOptions(width: 10, height: 10, resize: "fill", quality: 100, format: nil)
+
+        let data = try await storage
+            .from("images")
+            .download(path: path)
+
+        if false { // this block merely validates the presence of the transpiled API
+            try await images.copy(from: path, to: "public/tiny-copy.png")
+            let removed: [FileObject] = try await images.remove(paths: [path])
+            let updated: FileUploadResponse = try await images.update(path, data: fileData, options: FileOptions(cacheControl: "", contentType: "image/png", upsert: true, duplex: nil, metadata: nil /*["x": AnyJSON(stringLiteral: "ABC")]*/, headers: ["HeaderA": "ValueA"]))
+            let dopts = DestinationOptions(destinationBucket: "images2")
+            try await images.move(from: path, to: "public/tiny-move.png", options: dopts)
+            let downloaded: Data = try await images.download(path: path, options: topts)
+
+            // Bucket API
+            let bucket: Bucket = try await storage.getBucket("XYZ")
+            try await storage.createBucket("XYZ", options: BucketOptions(public: true, fileSizeLimit: "1024", allowedMimeTypes: ["image/png"]))
+            try await storage.updateBucket("XYZ", options: BucketOptions(public: true, fileSizeLimit: "1024", allowedMimeTypes: ["image/*"]))
+            try await storage.emptyBucket("XYZ")
+            try await storage.deleteBucket("XYZ")
+
+            // Unsupported API
+            #if !SKIP
+            // needs: https://github.com/supabase-community/supabase-kt/pull/694
+            let fileInfo: FileObjectV2 = try await images.info(path: path)
+            let exists = try await images.exists(path: path)
+            XCTAssertTrue(exists, "file did not exist at: \(path)")
+
+            // Signed URL API
+            let signedUploadURL: SignedUploadURL = try await images.createSignedUploadURL(path: path, options: CreateSignedUploadURLOptions(upsert: true))
+            let signedUploadResponse: SignedURLUploadResponse = try await images.uploadToSignedURL(path, token: "ABC", data: fileData, options: FileOptions(cacheControl: "", contentType: "image/png", upsert: true, duplex: nil, metadata: ["x": AnyJSON.string("ABC")], headers: ["HeaderA": "ValueA"]))
+
+            let _ = (removed, updated, downloaded, fileInfo, signedUploadURL, signedUploadResponse, buckets, bucket)
+            #endif
+        }
+
+        let sopts = SearchOptions(limit: 10, offset: 0, sortBy: nil, search: fileName)
+        let found: [FileObject] = try await images.list(path: folder, options: sopts)
+        XCTAssertEqual(1, found.count)
+
+        let publicURL1 = try images.getPublicURL(path: path, download: false, options: nil)
+        logger.log("created publicURL1: \(publicURL1.absoluteString)") // e.g. https://zncizygaxuzzvxnsfdvp.supabase.co/storage/v1/object/public/images/public/tiny-B3038153-515C-4A15-835D-513CFD0D9D68.png
+
+        let publicURL2 = try images.getPublicURL(path: path, download: false, options: TransformOptions(width: 200, height: 100, resize: "fill", quality: 100, format: nil))
+        logger.log("created publicURL2: \(publicURL2.absoluteString)") // e.g. https://zncizygaxuzzvxnsfdvp.supabase.co/storage/v1/render/image/public/images/public/tiny-811DE754-0161-43BB-9DD1-1E120589D7D1.png?width=200&height=100&resize=fill&quality=100
+
+        let signedURL: URL = try await images.createSignedURL(path: path, expiresIn: 60, download: false, transform: topts)
+        logger.log("created signedURL: \(signedURL.absoluteString)") // e.g.: https://zncizygaxuzzvxnsfdvp.supabase.co/storage/v1/object/sign/images/public/tiny-402E081D-19EB-4D93-B9AC-7C25645EC511.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJpbWFnZXMvcHVibGljL3RpbnktNDAyRTA4MUQtMTlFQi00RDkzLUI5QUMtN0MyNTY0NUVDNTExLnBuZyIsImlhdCI6MTczNjg5MDIzMCwiZXhwIjoxNzM2ODkwMjkwfQ.v5uYJSV2vMpfUMjnwu-aEIXlVFpwAZDEnQXhWYrpuaI
+
+        let response2: [FileObject] = try await images.remove(paths: [path])
+        XCTAssertEqual(1, response2.count)
+
+        XCTAssertEqual(data.base64EncodedString(), fileData.base64EncodedString())
     }
 }
