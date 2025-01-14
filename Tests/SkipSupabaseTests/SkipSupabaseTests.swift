@@ -265,7 +265,6 @@ final class SkipSupabaseTests: XCTestCase {
             let exists = try await images.exists(path: path)
             XCTAssertTrue(exists, "file did not exist at: \(path)")
 
-
             #if !SKIP
             // Signed URL API
             let signedURL: URL = try await images.createSignedURL(path: path, expiresIn: 60)
@@ -281,6 +280,7 @@ final class SkipSupabaseTests: XCTestCase {
             try await storage.deleteBucket("XYZ")
             try await storage.updateBucket("XYZ", options: BucketOptions(public: true, fileSizeLimit: "1024", allowedMimeTypes: ["image/*"]))
 
+            let _ = (removed, updated, downloaded, fileInfo, signedURL, signedUploadURL, publicURL, signedUploadResponse, bucket)
             #endif
         }
 

@@ -23,9 +23,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://source.skip.tools/skip.git", from: "1.2.18"),
         .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.2.10"),
-        // cannot update to 2.24.2 due to https://github.com/supabase/supabase-swift/issues/636
-        //.package(url: "https://github.com/supabase-community/supabase-swift.git", exact: "2.24.1")
-        .package(url: "https://github.com/supabase-community/supabase-swift.git", branch: "main")
+        .package(url: "https://github.com/supabase-community/supabase-swift.git", exact: "2.24.3")
     ],
     targets: [
         .target(name: "SkipSupabaseCore", dependencies: [
