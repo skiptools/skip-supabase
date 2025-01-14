@@ -229,4 +229,57 @@ final class SkipSupabaseTests: XCTestCase {
         let value1: Void = rpc1.value
         let _ = value1
     }
+
+    func testSupabaseStorage() async throws {
+        // create a random path
+        let bucket = "images"
+        let fileName = "tiny-\(UUID().uuidString).png"
+        let folder = "public"
+        let path = folder + "/" + fileName
+        let fileData = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mP4z8AAAAMBAQD3A0FDAAAAAElFTkSuQmCC")!
+
+        let storage: SupabaseStorageClient = client.storage
+        let images: StorageFileApi = storage.from(bucket)
+
+        let response1: FileUploadResponse = try await images
+            .upload(path, data: fileData, options: FileOptions(contentType: "image/png"))
+        XCTAssertEqual(path, response1.path)
+        XCTAssertEqual(bucket + "/" + path, response1.fullPath)
+
+
+        let data = try await storage
+            .from("images")
+            .download(path: path)
+
+        if false { // this block merely validates the presence of the transpiled API
+            try await images.copy(from: path, to: "public/tiny-copy.png")
+            let removed: [FileObject] = try await images.remove(paths: [path])
+            let updated: FileUploadResponse = try await images.update(path, data: fileData, options: FileOptions(cacheControl: "", contentType: "image/png", upsert: true, duplex: nil, metadata: nil /*["x": AnyJSON(stringLiteral: "ABC")]*/, headers: ["HeaderA": "ValueA"]))
+            let dopts = DestinationOptions(destinationBucket: "images2")
+            try await images.move(from: path, to: "public/tiny-move.png", options: dopts)
+            let topts = TransformOptions(width: 10, height: 10, resize: nil, quality: 100, format: "png")
+            let downloaded: Data = try await images.download(path: path, options: topts)
+
+            #if !SKIP
+            let fileInfo: FileObjectV2 = try await images.info(path: path)
+
+            let exists = try await images.exists(path: path)
+            XCTAssertTrue(exists, "file did not exist at: \(path)")
+
+            let signedURL: URL = try await images.createSignedURL(path: path, expiresIn: 60)
+            let signedUploadURL: SignedUploadURL = try await images.createSignedUploadURL(path: path, options: CreateSignedUploadURLOptions(upsert: true))
+            let publicURL = try images.getPublicURL(path: path, download: true, options: topts)
+            let signedUploadResponse: SignedURLUploadResponse = try await images.uploadToSignedURL(path, token: "ABC", data: fileData, options: FileOptions(cacheControl: "", contentType: "image/png", upsert: true, duplex: nil, metadata: ["x": AnyJSON(stringLiteral: "ABC")], headers: ["HeaderA": "ValueA"]))
+            #endif
+        }
+
+        let sopts = SearchOptions(limit: 10, offset: 0, sortBy: nil, search: fileName)
+        let found: [FileObject] = try await images.list(path: folder, options: sopts)
+        XCTAssertEqual(1, found.count)
+
+        let response2: [FileObject] = try await images.remove(paths: [path])
+        XCTAssertEqual(1, response2.count)
+
+        XCTAssertEqual(data.base64EncodedString(), fileData.base64EncodedString())
+    }
 }
