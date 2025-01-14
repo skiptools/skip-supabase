@@ -232,19 +232,19 @@ final class SkipSupabaseTests: XCTestCase {
 
     func testSupabaseStorage() async throws {
         // create a random path
-        let bucket = "images"
+        let bucketName = "images"
         let fileName = "tiny-\(UUID().uuidString).png"
         let folder = "public"
         let path = folder + "/" + fileName
         let fileData = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mP4z8AAAAMBAQD3A0FDAAAAAElFTkSuQmCC")!
 
         let storage: SupabaseStorageClient = client.storage
-        let images: StorageFileApi = storage.from(bucket)
+        let images: StorageFileApi = storage.from(bucketName)
 
         let response1: FileUploadResponse = try await images
             .upload(path, data: fileData, options: FileOptions(contentType: "image/png"))
         XCTAssertEqual(path, response1.path)
-        XCTAssertEqual(bucket + "/" + path, response1.fullPath)
+        XCTAssertEqual(bucketName + "/" + path, response1.fullPath)
 
 
         let data = try await storage
@@ -260,16 +260,27 @@ final class SkipSupabaseTests: XCTestCase {
             let topts = TransformOptions(width: 10, height: 10, resize: nil, quality: 100, format: "png")
             let downloaded: Data = try await images.download(path: path, options: topts)
 
-            #if !SKIP
             let fileInfo: FileObjectV2 = try await images.info(path: path)
 
             let exists = try await images.exists(path: path)
             XCTAssertTrue(exists, "file did not exist at: \(path)")
 
+
+            #if !SKIP
+            // Signed URL API
             let signedURL: URL = try await images.createSignedURL(path: path, expiresIn: 60)
             let signedUploadURL: SignedUploadURL = try await images.createSignedUploadURL(path: path, options: CreateSignedUploadURLOptions(upsert: true))
             let publicURL = try images.getPublicURL(path: path, download: true, options: topts)
             let signedUploadResponse: SignedURLUploadResponse = try await images.uploadToSignedURL(path, token: "ABC", data: fileData, options: FileOptions(cacheControl: "", contentType: "image/png", upsert: true, duplex: nil, metadata: ["x": AnyJSON(stringLiteral: "ABC")], headers: ["HeaderA": "ValueA"]))
+
+            // Bucket API
+            try await storage.createBucket("XYZ", options: BucketOptions(public: true, fileSizeLimit: "1024", allowedMimeTypes: ["image/png"]))
+            let buckets = try await storage.listBuckets()
+            let bucket: Bucket = try await storage.getBucket("XYZ")
+            try await storage.emptyBucket("XYZ")
+            try await storage.deleteBucket("XYZ")
+            try await storage.updateBucket("XYZ", options: BucketOptions(public: true, fileSizeLimit: "1024", allowedMimeTypes: ["image/*"]))
+
             #endif
         }
 
