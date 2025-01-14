@@ -104,7 +104,6 @@ func dict2JsonObject(_ dict: [String: AnyJSON]?) -> kotlinx.serialization.json.J
 func instant2date(_ instant: kotlinx.datetime.Instant?) -> Date? {
     guard let instant = instant else { return nil }
     return Date(platformValue: java.util.Date(instant.toEpochMilliseconds()))
-
 }
 
 /// Create a DateFormatter to use for encoding and decoding dates from Supabase

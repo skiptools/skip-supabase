@@ -10,7 +10,11 @@ import Foundation
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
 import io.github.jan.supabase.storage.__
+import io.github.jan.supabase.storage.BucketBuilder
 import io.github.jan.supabase.auth.minimalSettings
+
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 #endif
 
 #if SKIP
@@ -22,14 +26,118 @@ extension SupabaseClient {
     }
 }
 
-public class SupabaseStorageClient: StorageBucketApi, @unchecked Sendable {
+public class StorageApi: @unchecked Sendable {
+//    public let configuration: StorageClientConfiguration
+//
+//    public init(configuration: StorageClientConfiguration) {
+//    }
+}
+
+/// Storage Bucket API
+public class StorageBucketApi: StorageApi, @unchecked Sendable {
     fileprivate let storage: io.github.jan.supabase.storage.Storage
+    //public let configuration: StorageClientConfiguration
 
     init(storage: io.github.jan.supabase.storage.Storage) {
         self.storage = storage
+
+        //var configuration = configuration
+        //    if configuration.headers["X-Client-Info"] == nil {
+        //      configuration.headers["X-Client-Info"] = "storage-swift/\(version)"
+        //    }
+        //self.configuration = configuration
     }
 
+    /// Retrieves the details of all Storage buckets within an existing project.
+    public func listBuckets() async throws -> [Bucket] {
+        // SKIP NOWARN
+        try await Array(storage.retrieveBuckets()).map({ Bucket(bucket: $0) })
+    }
 
+    /// Retrieves the details of an existing Storage bucket.
+    /// - Parameters:
+    ///   - id: The unique identifier of the bucket you would like to retrieve.
+    public func getBucket(_ id: String) async throws -> Bucket {
+        // SKIP NOWARN
+        guard let bucket = storage.retrieveBucketById(id) else {
+            throw BucketNotFoundError(localizedDescription: "No such bucket: \(id)")
+        }
+        try await Bucket(bucket: bucket)
+    }
+
+    /// Creates a new Storage bucket.
+    /// - Parameters:
+    ///   - id: A unique identifier for the bucket you are creating.
+    ///   - options: Options for creating the bucket.
+    public func createBucket(_ id: String, options: BucketOptions = .init()) async throws {
+        // SKIP NOWARN
+        try await storage.createBucket(id) {
+            `public` = options.`public`
+            if let size = options.fileSizeLimit {
+                // let limit =  io.github.jan.supabase.storage.FileSizeLimit(string) // internal-only
+                // so we need to use the extension defined in https://github.com/supabase-community/supabase-kt/blob/master/Storage/src/commonMain/kotlin/io/github/jan/supabase/storage/BucketBuilder.kt
+                if size.hasSuffix("gb"), let limit = Long(size.dropLast(2)) {
+                    fileSizeLimit = limit.gigabytes
+                } else if size.hasSuffix("mb"), let limit = Long(size.dropLast(2)) {
+                    fileSizeLimit = limit.megabytes
+                } else if size.hasSuffix("kb"), let limit = Long(size.dropLast(2)) {
+                    fileSizeLimit = limit.kilobytes
+                } else if size.hasSuffix("b"), let limit = Long(size.dropLast(1)) {
+                    fileSizeLimit = limit.bytes
+                }
+            }
+            if let mimes = options.allowedMimeTypes {
+                allowedMimeTypes(mimeTypes: mimes.toList())
+            }
+        }
+    }
+
+    /// Updates a Storage bucket.
+    /// - Parameters:
+    ///   - id: A unique identifier for the bucket you are updating.
+    ///   - options: Options for updating the bucket.
+    public func updateBucket(_ id: String, options: BucketOptions) async throws {
+        // SKIP NOWARN
+        try await storage.updateBucket(id) {
+            `public` = options.`public`
+            if let size = options.fileSizeLimit {
+                // let limit =  io.github.jan.supabase.storage.FileSizeLimit(string) // internal-only
+                // so we need to use the extension defined in https://github.com/supabase-community/supabase-kt/blob/master/Storage/src/commonMain/kotlin/io/github/jan/supabase/storage/BucketBuilder.kt
+                if size.hasSuffix("gb"), let limit = Long(size.dropLast(2)) {
+                    fileSizeLimit = limit.gigabytes
+                } else if size.hasSuffix("mb"), let limit = Long(size.dropLast(2)) {
+                    fileSizeLimit = limit.megabytes
+                } else if size.hasSuffix("kb"), let limit = Long(size.dropLast(2)) {
+                    fileSizeLimit = limit.kilobytes
+                } else if size.hasSuffix("b"), let limit = Long(size.dropLast(1)) {
+                    fileSizeLimit = limit.bytes
+                }
+            }
+            if let mimes = options.allowedMimeTypes {
+                allowedMimeTypes(mimeTypes: mimes.toList())
+            }
+        }
+    }
+
+    /// Removes all objects inside a single bucket.
+    /// - Parameters:
+    ///   - id: The unique identifier of the bucket you would like to empty.
+    public func emptyBucket(_ id: String) async throws {
+        // SKIP NOWARN
+        try await storage.emptyBucket(id)
+    }
+
+    /// Deletes an existing bucket. A bucket can't be deleted with existing objects inside it.
+    /// You must first `empty()` the bucket.
+    /// - Parameters:
+    ///   - id: The unique identifier of the bucket you would like to delete.
+    public func deleteBucket(_ id: String) async throws {
+        // SKIP NOWARN
+        try await storage.deleteBucket(id)
+    }
+}
+
+public class SupabaseStorageClient: StorageBucketApi, @unchecked Sendable {
     /// Perform file operation in a bucket.
     /// - Parameter id: The bucket id to operate on.
     /// - Returns: StorageFileApi object
@@ -38,56 +146,9 @@ public class SupabaseStorageClient: StorageBucketApi, @unchecked Sendable {
     }
 }
 
-/// Storage Bucket API
-public class StorageBucketApi: StorageApi, @unchecked Sendable {
-    /// Retrieves the details of all Storage buckets within an existing project.
-    @available(*, unavailable)
-    public func listBuckets() async throws -> [Bucket] {
-        fatalError("TODO: listBuckets")
-    }
 
-    /// Retrieves the details of an existing Storage bucket.
-    /// - Parameters:
-    ///   - id: The unique identifier of the bucket you would like to retrieve.
-    @available(*, unavailable)
-    public func getBucket(_ id: String) async throws -> Bucket {
-        fatalError("TODO: getBucket")
-    }
-
-    /// Creates a new Storage bucket.
-    /// - Parameters:
-    ///   - id: A unique identifier for the bucket you are creating.
-    ///   - options: Options for creating the bucket.
-    @available(*, unavailable)
-    public func createBucket(_ id: String, options: BucketOptions = .init()) async throws {
-        fatalError("TODO: createBucket")
-    }
-
-    /// Updates a Storage bucket.
-    /// - Parameters:
-    ///   - id: A unique identifier for the bucket you are updating.
-    ///   - options: Options for updating the bucket.
-    @available(*, unavailable)
-    public func updateBucket(_ id: String, options: BucketOptions) async throws {
-        fatalError("TODO: updateBucket")
-    }
-
-    /// Removes all objects inside a single bucket.
-    /// - Parameters:
-    ///   - id: The unique identifier of the bucket you would like to empty.
-    @available(*, unavailable)
-    public func emptyBucket(_ id: String) async throws {
-        fatalError("TODO: emptyBucket")
-    }
-
-    /// Deletes an existing bucket. A bucket can't be deleted with existing objects inside it.
-    /// You must first `empty()` the bucket.
-    /// - Parameters:
-    ///   - id: The unique identifier of the bucket you would like to delete.
-    @available(*, unavailable)
-    public func deleteBucket(_ id: String) async throws {
-        fatalError("TODO: deleteBucket")
-    }
+public struct BucketNotFoundError : Error {
+    var localizedDescription: String
 }
 
 // TODO: add property support
@@ -117,36 +178,10 @@ public struct StorageClientConfiguration: Sendable {
     }
 }
 
-
 enum FileUpload {
     case data(Data)
     case url(URL)
 }
-
-public class StorageApi: @unchecked Sendable {
-    //public let configuration: StorageClientConfiguration
-
-    //  private let http: any HTTPClientType
-
-    public init() {
-        //var configuration = configuration
-        //    if configuration.headers["X-Client-Info"] == nil {
-        //      configuration.headers["X-Client-Info"] = "storage-swift/\(version)"
-        //    }
-        //self.configuration = configuration
-
-        //    var interceptors: [any HTTPClientInterceptor] = []
-        //    if let logger = configuration.logger {
-        //      interceptors.append(LoggerInterceptor(logger: logger))
-        //    }
-        //
-        //    http = HTTPClient(
-        //      fetch: configuration.session.fetch,
-        //      interceptors: interceptors
-        //    )
-    }
-}
-
 
 /// Supabase Storage File API
 public class StorageFileApi: StorageApi, @unchecked Sendable {
@@ -277,7 +312,8 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
         download: String? = nil,
         transform: TransformOptions? = nil
     ) async throws -> URL {
-        fatalError("TODO: createSignedURL")
+        // TODO: handle download parameter
+        return try await createSignedURL(path: path, expiresIn: expiresIn, download: false, transform: transform)
     }
 
     /// Creates a signed URL. Use a signed URL to share a file for a fixed amount of time.
@@ -286,14 +322,23 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
     ///   - expiresIn: The number of seconds until the signed URL expires. For example, `60` for a URL which is valid for one minute.
     ///   - download: Trigger a download with the default file name.
     ///   - transform: Transform the asset before serving it to the client.
-    @available(*, unavailable)
     public func createSignedURL(
         path: String,
         expiresIn: Int,
         download: Bool,
         transform: TransformOptions? = nil
     ) async throws -> URL {
-        fatalError("TODO: createSignedURL")
+        // SKIP NOWARN
+        URL(string: try await bucket.createSignedUrl(path: path, expiresIn: expiresIn.seconds) {
+            if let options = transform {
+                quality = options.quality
+                format = options.format
+                resize = options.resize == "cover" ? ImageTransformation.Resize.COVER : options.resize == "contain" ? ImageTransformation.Resize.CONTAIN : options.resize == "fill" ? ImageTransformation.Resize.FILL : nil
+                if let width = options.width, let height = options.height {
+                    size(width, height)
+                }
+            }
+        })!
     }
 
     /// Creates multiple signed URLs. Use a signed URL to share a file for a fixed amount of time.
@@ -382,6 +427,8 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
     }
 
     /// Retrieves the details of an existing file.
+    /// Needs: https://github.com/supabase-community/supabase-kt/pull/694
+    @available(*, unavailable)
     public func info(path: String) async throws -> FileObjectV2 {
         fatalError("TODO: info")
 //        public let id: String
@@ -399,15 +446,11 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
 //        public let metadata: [String: AnyJSON]?
     }
 
+    /// Needs: https://github.com/supabase-community/supabase-kt/pull/694
     /// Checks the existence of file.
+    @available(*, unavailable)
     public func exists(path: String) async throws -> Bool {
-        do {
-            let _ = try await info(path: path)
-            return false
-        } catch {
-            // any exception will trigger a failure
-            return false
-        }
+        fatalError("TODO: exists")
     }
 
     /// A simple convenience function to get the URL for an asset in a public bucket. If you do not want to use this function, you can construct the public URL by concatenating the bucket URL with the path to the asset. This function does not verify if the bucket is public. If a public URL is created for a bucket which is not public, you will not be able to download the asset.
@@ -423,7 +466,8 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
         download: String? = nil,
         options: TransformOptions? = nil
     ) throws -> URL {
-        fatalError("TODO: getPublicURL")
+        // TODO: handle download parameter
+        try await getPublicURL(path, download: false, options: options)
     }
 
     /// A simple convenience function to get the URL for an asset in a public bucket. If you do not want to use this function, you can construct the public URL by concatenating the bucket URL with the path to the asset. This function does not verify if the bucket is public. If a public URL is created for a bucket which is not public, you will not be able to download the asset.
@@ -433,14 +477,26 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
     ///  - options: Transform the asset before retrieving it on the client.
     ///
     ///  - Note: The bucket needs to be set to public, either via ``StorageBucketApi/updateBucket(_:options:)`` or by going to Storage on [supabase.com/dashboard](https://supabase.com/dashboard), clicking the overflow menu on a bucket and choosing "Make public".
-    @available(*, unavailable)
     public func getPublicURL(
         path: String,
         download: Bool,
         options: TransformOptions? = nil
     ) throws -> URL {
-        fatalError("TODO: getPublicURL")
-        //    try getPublicURL(path: path, download: download ? "" : nil, options: options)
+        // SKIP NOWARN
+        if let options = options {
+            return URL(string: try await bucket.publicRenderUrl(path: path) {
+                if let options = options {
+                    quality = options.quality
+                    format = options.format
+                    resize = options.resize == "cover" ? ImageTransformation.Resize.COVER : options.resize == "contain" ? ImageTransformation.Resize.CONTAIN : options.resize == "fill" ? ImageTransformation.Resize.FILL : nil
+                    if let width = options.width, let height = options.height {
+                        size(width, height)
+                    }
+                }
+            })!
+        } else {
+            return URL(string: try await bucket.publicUrl(path: path))!
+        }
     }
 
     /// Creates a signed upload URL. Signed upload URLs can be used to upload files to the bucket without further authentication. They are valid for 2 hours.
@@ -754,14 +810,6 @@ public struct DestinationOptions: Sendable {
     }
 }
 
-private func toDate(_ instant: kotlinx.datetime.Instant?) -> Date? {
-    guard let instant else {
-        return nil
-    }
-
-    return Date(timeIntervalSince1970: TimeInterval(instant.toEpochMilliseconds()) / 1000.0)
-}
-
 public struct FileObject: Identifiable, Hashable, Codable, Sendable {
     public var name: String
     public var bucketId: String?
@@ -780,9 +828,9 @@ public struct FileObject: Identifiable, Hashable, Codable, Sendable {
         if let id = object.id {
             self.id = UUID(uuidString: id)
         }
-        self.updatedAt = toDate(object.updatedAt)
-        self.createdAt = toDate(object.createdAt)
-        self.lastAccessedAt = toDate(object.lastAccessedAt)
+        self.updatedAt = instant2date(object.updatedAt)
+        self.createdAt = instant2date(object.createdAt)
+        self.lastAccessedAt = instant2date(object.lastAccessedAt)
         //self.metadata = object.metadata
         //self.buckets = object.buckets
     }
@@ -863,6 +911,19 @@ public struct Bucket: Identifiable, Hashable, Codable, Sendable {
     public var updatedAt: Date
     public var allowedMimeTypes: [String]?
     public var fileSizeLimit: Int64?
+
+    fileprivate init(bucket: io.github.jan.supabase.storage.Bucket) {
+        self.id = bucket.id
+        self.name = bucket.name
+        self.owner = bucket.owner
+        self.isPublic = bucket.public
+        self.createdAt = instant2date(bucket.createdAt) ?? .now
+        self.updatedAt = instant2date(bucket.updatedAt) ?? .now
+        if let mimes = bucket.allowedMimeTypes {
+            self.allowedMimeTypes = Array(mimes)
+        }
+        self.fileSizeLimit = bucket.fileSizeLimit
+    }
 
     public init(
         id: String,
