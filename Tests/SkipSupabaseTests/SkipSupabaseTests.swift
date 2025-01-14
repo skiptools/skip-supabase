@@ -25,11 +25,6 @@ fileprivate let client = SupabaseClient(
 
 final class SkipSupabaseTests: XCTestCase {
     func testSkipSupabaseAuth() async throws {
-
-        #if SKIP
-        //com.russhwolf.settings.Settings() // else: com.russhwolf.settings.NoArgKt.Settings(NoArg.kt:32)
-        #endif
-
         let ac: AuthClient = client.auth
         XCTAssertNil(ac.currentSession)
         XCTAssertNil(ac.currentSession?.user.email)
@@ -47,12 +42,6 @@ final class SkipSupabaseTests: XCTestCase {
             try await ac.signIn(phone: "", password: "", captchaToken: "")
             try await ac.signInAnonymously()
             try await ac.signInAnonymously(captchaToken: "")
-            //try await ac.signInAnonymously(data: ["key": .string("value")])
-
-            //try await ac.signInWithSSO(domain: <#T##String#>, redirectTo: <#T##URL?#>, captchaToken: <#T##String?#>)
-            //try await ac.signInWithOTP(phone: <#T##String#>, channel: <#T##MessagingChannel#>, shouldCreateUser: <#T##Bool#>, data: <#T##[String : AnyJSON]?#>, captchaToken: <#T##String?#>)
-            //try await ac.signInWithOTP(email: <#T##String#>, redirectTo: <#T##URL?#>, shouldCreateUser: <#T##Bool#>, data: <#T##[String : AnyJSON]?#>, captchaToken: <#T##String?#>)
-            //try await ac.signInWithOAuth(provider: <#T##Provider#>, redirectTo: <#T##URL?#>, scopes: <#T##String?#>, queryParams: <#T##[(name: String, value: String?)]#>, configure: <#T##(ASWebAuthenticationSession) -> Void##(ASWebAuthenticationSession) -> Void##(_ session: ASWebAuthenticationSession) -> Void#>)
 
 
             try await ac.signOut()
@@ -65,6 +54,29 @@ final class SkipSupabaseTests: XCTestCase {
             XCTFail("signIn should have failed")
         } catch {
             // expected
+        }
+
+        // check for unsupported API
+        // SKIP NOWARN
+        if false {
+            #if !SKIP
+            let signUpResponse1: AuthResponse = try await ac.signUp(email: "", password: "", data: [:], redirectTo: nil, captchaToken: "")
+            let signUpResponse2: AuthResponse = try await ac.signUp(phone: "", password: "", channel: MessagingChannel.whatsapp, data: [:], captchaToken: "")
+
+            let session1: Session = try await ac.exchangeCodeForSession(authCode: "")
+            let session2: Session = try await ac.setSession(accessToken: "", refreshToken: "")
+            let session3: Session = try await ac.refreshSession(refreshToken: "")
+
+            try await ac.signInAnonymously(data: ["key": .string("value")])
+
+            let ssoSession1 = try await ac.signInWithSSO(domain: "", redirectTo: nil, captchaToken: "")
+            let ssoSession2 = try await ac.signInWithSSO(providerId: "", redirectTo: nil, captchaToken: "")
+            try await ac.signInWithOTP(phone: "", channel: MessagingChannel.sms, shouldCreateUser: false, data: [:], captchaToken: "")
+            try await ac.signInWithOTP(email: "", redirectTo: nil, shouldCreateUser: false, data: [:], captchaToken: "")
+
+            try await ac.signInWithOAuth(provider: Provider.apple, redirectTo: nil, scopes: "", queryParams: [(name: "", value: "")]) { session in
+            }
+            #endif
         }
     }
 

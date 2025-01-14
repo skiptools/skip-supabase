@@ -431,19 +431,6 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
     @available(*, unavailable)
     public func info(path: String) async throws -> FileObjectV2 {
         fatalError("TODO: info")
-//        public let id: String
-//        public let version: String
-//        public let name: String
-//        public let bucketId: String?
-//        public let updatedAt: Date?
-//        public let createdAt: Date?
-//        public let lastAccessedAt: Date?
-//        public let size: Int?
-//        public let cacheControl: String?
-//        public let contentType: String?
-//        public let etag: String?
-//        public let lastModified: Date?
-//        public let metadata: [String: AnyJSON]?
     }
 
     /// Needs: https://github.com/supabase-community/supabase-kt/pull/694
@@ -467,6 +454,7 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
         options: TransformOptions? = nil
     ) throws -> URL {
         // TODO: handle download parameter
+        // SKIP NOWARN
         try await getPublicURL(path, download: false, options: options)
     }
 

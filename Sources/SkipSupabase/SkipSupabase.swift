@@ -55,13 +55,15 @@ public class SupabaseClient {
             defaultSerializer = CodableSerializer()
 
             install(Auth) {
+                // enable only when running in Robolectric tests
+                if ProcessInfo.processInfo.environment["ANDROID_ROOT"] == nil {
+                    minimalSettings() // “Applies minimal settings to the [AuthConfig]. This is useful for server side applications, where you don't need to store the session or code verifier.”
+                }
+
                 // needed or else NPE on startup: https://github.com/supabase-community/supabase-kt/issues/69
                 // and java.lang.ExceptionInInitializerError: Exception java.lang.IllegalStateException: Failed to create default settings for SettingsSessionManager. You might have to provide a custom settings instance or a custom session manager. Learn more at https://github.com/supabase-community/supabase-kt/wiki/Session-Saving
                 //sessionManager = io.github.jan.supabase.auth.SettingsSessionManager(com.russhwolf.settings.MapSettings())
                 //sessionManager = io.github.jan.supabase.auth.MemorySessionManager()
-
-                // TODO: enable only when running in Robolectric tests
-                minimalSettings() // “Applies minimal settings to the [AuthConfig]. This is useful for server side applications, where you don't need to store the session or code verifier.”
             }
             install(Postgrest)
             install(Storage) {
