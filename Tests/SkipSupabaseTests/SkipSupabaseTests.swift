@@ -24,6 +24,13 @@ fileprivate let client = SupabaseClient(
 
 
 final class SkipSupabaseTests: XCTestCase {
+    override func setUp() {
+        #if SKIP
+        // enable calling minimalSettings() when setting up Auth for the purpoases of unit tests
+        System.setProperty("skip_supabase_auth_minimalSettings", "1")
+        #endif
+    }
+
     func testSkipSupabaseAuth() async throws {
         let ac: AuthClient = client.auth
         XCTAssertNil(ac.currentSession)

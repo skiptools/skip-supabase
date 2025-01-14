@@ -56,7 +56,7 @@ public class SupabaseClient {
 
             install(Auth) {
                 // enable only when running in Robolectric tests
-                if ProcessInfo.processInfo.environment["ANDROID_ROOT"] == nil {
+                if System.getProperty("skip_supabase_auth_minimalSettings") != nil {
                     minimalSettings() // “Applies minimal settings to the [AuthConfig]. This is useful for server side applications, where you don't need to store the session or code verifier.”
                 }
 
