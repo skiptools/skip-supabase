@@ -5,14 +5,14 @@ The Swift side uses the official Supabase iOS SDK directly,
 with the various `SkipSupabase*` modules passing the transpiled calls
 through to the community Supabase Android SDK.
 
-[!WARNING]
+> [!WARNING]
 The current Supabase API coverage is currently very limited, and mostly used as a starting point.
 
 Browse the test cases at
 [SkipSupabaseTests.swift](https://github.com/skiptools/skip-supabase/blob/main/Tests/SkipSupabaseTests/SkipSupabaseTests.swift)
 to see what API is supported.
 
-[!NOTE]
+> [!NOTE]
 [Skip native](https://skip.tools/docs/modes/) can use the [Supabase Swift API](https://supabase.com/docs/reference/swift) directly without needing this package. See the [Supachar Sample](https://github.com/skiptools/skipapp-supachat/) sample app.
 
 ## Package
