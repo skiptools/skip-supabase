@@ -13,7 +13,7 @@ Browse the test cases at
 to see what API is supported.
 
 > [!NOTE]
-[Skip native](https://skip.tools/docs/modes/) can use the [Supabase Swift API](https://supabase.com/docs/reference/swift) directly without needing this package. See the [Supachar Sample](https://github.com/skiptools/skipapp-supachat/) sample app.
+[Skip native](https://skip.tools/docs/modes/) can use the [Supabase Swift API](https://supabase.com/docs/reference/swift) directly without needing this package. See the [Supachat Sample](https://github.com/skiptools/skipapp-supachat/) sample app.
 
 ## Package
 
