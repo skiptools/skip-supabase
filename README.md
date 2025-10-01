@@ -5,6 +5,30 @@ The Swift side uses the official Supabase iOS SDK directly,
 with the various `SkipSupabase*` modules passing the transpiled calls
 through to the community Supabase Android SDK.
 
+## Setup
+
+To include this framework in your project, add the following
+dependency to your `Package.swift` file:
+
+```swift
+let package = Package(
+    name: "my-package",
+    products: [
+        .library(name: "MyProduct", targets: ["MyTarget"]),
+    ],
+    dependencies: [
+        .package(url: "https://source.skip.tools/skip-supabase.git", "0.0.0"..<"2.0.0"),
+    ],
+    targets: [
+        .target(name: "MyTarget", dependencies: [
+            .product(name: "SkipSupabase", package: "skip-supabase")
+        ])
+    ]
+)
+```
+
+## Usage
+
 > [!WARNING]
 The current Supabase API coverage is currently very limited, and mostly used as a starting point.
 
