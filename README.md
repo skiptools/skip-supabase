@@ -1,6 +1,6 @@
 # SkipSupabase
 
-This package provides Supabase support for [Skip Lite](https://skip.tools) transpiled Swift.
+This package provides Supabase support for [Skip Lite](https://skip.dev) transpiled Swift.
 The Swift side uses the official Supabase iOS SDK directly,
 with the various `SkipSupabase*` modules passing the transpiled calls
 through to the community Supabase Android SDK.
@@ -17,7 +17,7 @@ let package = Package(
         .library(name: "MyProduct", targets: ["MyTarget"]),
     ],
     dependencies: [
-        .package(url: "https://source.skip.tools/skip-supabase.git", "0.0.0"..<"2.0.0"),
+        .package(url: "https://source.skip.dev/skip-supabase.git", "0.0.0"..<"2.0.0"),
     ],
     targets: [
         .target(name: "MyTarget", dependencies: [
@@ -37,7 +37,7 @@ Browse the test cases at
 to see what API is supported.
 
 > [!NOTE]
-[Skip Fuse](https://skip.tools/docs/modes/) native apps can use the [Supabase Swift API](https://supabase.com/docs/reference/swift) directly without needing this package.
+[Skip Fuse](https://skip.dev/docs/modes/) native apps can use the [Supabase Swift API](https://supabase.com/docs/reference/swift) directly without needing this package.
 
 ## Package
 
