@@ -33,7 +33,10 @@ public class AuthClient {
 
     public var session: Session {
         get throws {
-            fatalError("TODO")
+            guard let session = auth.currentSessionOrNull() else {
+                throw AuthError.sessionMissing
+            }
+            return Session(session: session)
         }
     }
 
@@ -80,6 +83,51 @@ public class AuthClient {
         // SKIP NOWARN
         try await auth.signOut(scope.kotlinScope)
     }
+
+    /// Refresh the current session. Returns the refreshed session.
+    @discardableResult
+    public func refreshSession(refreshToken: String? = nil) async throws -> Session {
+        // SKIP NOWARN
+        try await auth.refreshCurrentSession()
+        guard let session = auth.currentSessionOrNull() else {
+            throw AuthError.sessionMissing
+        }
+        return Session(session: session)
+    }
+
+    /// Update the current user's attributes (email, phone, password, or metadata).
+    @discardableResult
+    public func update(user attributes: UserAttributes) async throws -> User {
+        // SKIP NOWARN
+        let userInfo = try await auth.updateUser {
+            if let email = attributes.email { self.email = email }
+            if let phone = attributes.phone { self.phone = phone }
+            if let password = attributes.password { self.password = password }
+        }
+        return User(userInfo: userInfo)
+    }
+}
+
+/// Errors that can occur during authentication.
+public enum AuthError: Error {
+    case sessionMissing
+}
+
+/// Attributes that can be updated on the current user.
+public struct UserAttributes: Sendable {
+    public var email: String?
+    public var phone: String?
+    public var password: String?
+
+    public init(
+        email: String? = nil,
+        phone: String? = nil,
+        password: String? = nil
+    ) {
+        self.email = email
+        self.phone = phone
+        self.password = password
+    }
 }
 
 public enum SignOutScope: String, Sendable {
@@ -109,6 +157,31 @@ public class Session {
     public var user: User {
         User(userInfo: session.user!)
     }
+
+    /// The access token (JWT) for the current session.
+    public var accessToken: String {
+        session.accessToken
+    }
+
+    /// The refresh token for renewing the session.
+    public var refreshToken: String {
+        session.refreshToken
+    }
+
+    /// The token type (typically "bearer").
+    public var tokenType: String {
+        session.tokenType
+    }
+
+    /// The number of seconds until the session expires.
+    public var expiresIn: Double {
+        Double(session.expiresIn)
+    }
+
+    /// The epoch timestamp (seconds since 1970) when the session expires.
+    public var expiresAt: Double {
+        Double(session.expiresAt.epochSeconds)
+    }
 }
 
 public class User {
@@ -137,8 +210,8 @@ public class User {
     public var lastSignInAt: Date? { instant2date(userInfo.lastSignInAt) }
     public var role: String? { userInfo.role }
     public var updatedAt: Date { instant2date(userInfo.updatedAt)! }
+    public var isAnonymous: Bool { userInfo.isAnonymous == true }
 //    public var identities: [UserIdentity]?
-//    public var isAnonymous: Bool { userInfo.isAnonymous }
 //    public var factors: [Factor]?
 
 }

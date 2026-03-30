@@ -365,10 +365,28 @@ public class PostgrestFilterBuilder : PostgrestTransformBuilder {
         filter({ $0.eq(column: columnName, value: value) })
     }
 
-    @available(*, unavailable)
-    public func fts(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
-        //filter({ $0.fts(column: columnName, value: value) })
-        self
+    /// Match rows where `column` matches `pattern` using SQL LIKE (case-sensitive).
+    /// Use `%` as a wildcard character.
+    public func like(_ columnName: String, pattern: Any) -> PostgrestFilterBuilder {
+        filter({ $0.like(columnName, "\(pattern)") })
+    }
+
+    /// Match rows where `column` matches `pattern` using SQL ILIKE (case-insensitive).
+    /// Use `%` as a wildcard character.
+    public func ilike(_ columnName: String, pattern: Any) -> PostgrestFilterBuilder {
+        filter({ $0.ilike(columnName, "\(pattern)") })
+    }
+
+    /// Match rows where `column` is `null` or a boolean value.
+    /// Pass `nil` to check for NULL, or `true`/`false` for boolean columns.
+    public func `is`(_ columnName: String, value: Bool?) -> PostgrestFilterBuilder {
+        filter({ $0.exact(columnName, value) })
+    }
+
+    /// Perform a full-text search on `column` using `query`.
+    public func textSearch(_ columnName: String, query: String, config: String? = nil, type: TextSearchType? = nil) -> PostgrestFilterBuilder {
+        let ktType = type?.kotlinType ?? io.github.jan.supabase.postgrest.query.filter.TextSearchType.NONE
+        return filter({ $0.textSearch(columnName, query, ktType, config ?? "") })
     }
 
     public func greaterThan(_ columnName: String, _ value: Any) -> PostgrestFilterBuilder {
@@ -499,6 +517,14 @@ public enum TextSearchType: String, Sendable {
     /// This function will never raise syntax errors, which makes it possible to use raw user-supplied
     /// input for search, and can be used with advanced operators.
     case websearch = "w"
+
+    var kotlinType: io.github.jan.supabase.postgrest.query.filter.TextSearchType {
+        switch self {
+        case .plain: return io.github.jan.supabase.postgrest.query.filter.TextSearchType.PLAINTO
+        case .phrase: return io.github.jan.supabase.postgrest.query.filter.TextSearchType.PHRASETO
+        case .websearch: return io.github.jan.supabase.postgrest.query.filter.TextSearchType.WEBSEARCH
+        }
+    }
 }
 
 #endif

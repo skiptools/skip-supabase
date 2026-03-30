@@ -287,19 +287,21 @@ final class SkipSupabaseTests: XCTestCase {
             try await storage.emptyBucket("XYZ")
             try await storage.deleteBucket("XYZ")
 
-            // Unsupported API
-            #if !SKIP
-            // needs: https://github.com/supabase-community/supabase-kt/pull/694
+            // File info and existence check (now available on both platforms)
             let fileInfo: FileObjectV2 = try await images.info(path: path)
             let exists = try await images.exists(path: path)
             XCTAssertTrue(exists, "file did not exist at: \(path)")
 
-            // Signed URL API
+            // Signed upload URL API (now available on both platforms)
             let signedUploadURL: SignedUploadURL = try await images.createSignedUploadURL(path: path, options: CreateSignedUploadURLOptions(upsert: true))
-            let signedUploadResponse: SignedURLUploadResponse = try await images.uploadToSignedURL(path, token: "ABC", data: fileData, options: FileOptions(cacheControl: "", contentType: "image/png", upsert: true, duplex: nil, metadata: ["x": AnyJSON.string("ABC")], headers: ["HeaderA": "ValueA"]))
+            let signedUploadResponse: SignedURLUploadResponse = try await images.uploadToSignedURL(path, token: signedUploadURL.token, data: fileData, options: FileOptions(contentType: "image/png", upsert: true))
 
-            let _ = (removed, updated, downloaded, fileInfo, signedUploadURL, signedUploadResponse, buckets, bucket)
-            #endif
+            // Multiple signed URLs (now available on both platforms)
+            let signedURLs: [URL] = try await images.createSignedURLs(paths: [path], expiresIn: 60)
+
+            let _ = removed; let _ = updated; let _ = downloaded
+            let _ = fileInfo; let _ = signedUploadURL; let _ = signedUploadResponse
+            let _ = signedURLs; let _ = buckets; let _ = bucket
         }
 
         let sopts = SearchOptions(limit: 10, offset: 0, sortBy: nil, search: fileName)
@@ -319,5 +321,162 @@ final class SkipSupabaseTests: XCTestCase {
         XCTAssertEqual(1, response2.count)
 
         XCTAssertEqual(data.base64EncodedString(), fileData.base64EncodedString())
+    }
+
+    func testSupabaseStorageInfoAndExists() async throws {
+        let bucketName = "images"
+        let fileName = "info-test-\(UUID().uuidString).png"
+        let path = "public/" + fileName
+        let fileData = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mP4z8AAAAMBAQD3A0FDAAAAAElFTkSuQmCC")!
+
+        let images = client.storage.from(bucketName)
+
+        // Upload a file
+        let _: FileUploadResponse = try await images.upload(path, data: fileData, options: FileOptions(contentType: "image/png"))
+
+        // Check exists
+        let doesExist = try await images.exists(path: path)
+        XCTAssertTrue(doesExist, "File should exist after upload")
+
+        // Get file info
+        let fileInfo: FileObjectV2 = try await images.info(path: path)
+        XCTAssertTrue(fileInfo.name.contains(fileName), "Expected name to contain \(fileName), got \(fileInfo.name)")
+        XCTAssertTrue(fileInfo.size ?? 0 > 0, "File size should be > 0")
+
+        // Create multiple signed URLs
+        let urls = try await images.createSignedURLs(paths: [path], expiresIn: 60, download: false)
+        XCTAssertEqual(urls.count, 1)
+
+        // Clean up
+        let _ = try await images.remove(paths: [path])
+
+        // Check no longer exists
+        let existsAfterRemove = try await images.exists(path: path)
+        XCTAssertFalse(existsAfterRemove, "File should not exist after removal")
+    }
+
+    func testSkipSupabaseAuthSession() async throws {
+        let ac: AuthClient = client.auth
+
+        // Verify currentSession is nil before sign-in
+        XCTAssertNil(ac.currentSession)
+
+        // On Skip, session getter should throw when not signed in
+        #if SKIP
+        do {
+            let _ = try ac.session
+            XCTFail("session should throw when not signed in")
+        } catch {
+            // expected: AuthError.sessionMissing
+        }
+        #endif
+    }
+
+    func testSkipSupabaseAuthTypes() throws {
+        // Verify SignOutScope enum values
+        let scopes: [SignOutScope] = [.global, .local, .others]
+        XCTAssertEqual(scopes.count, 3)
+
+        // Verify UserAttributes construction
+        let attrs = UserAttributes(email: "test@example.com", password: "newpass")
+        XCTAssertEqual(attrs.email, "test@example.com")
+        XCTAssertEqual(attrs.password, "newpass")
+        XCTAssertNil(attrs.phone)
+    }
+
+    func testSkipSupabaseDatabaseLike() async throws {
+        // Ensure test data exists
+        // SKIP NOWARN
+        let _: PostgrestResponse<Void> = try await client.from("countries").delete().gte("id", value: 0).execute()
+
+        // SKIP NOWARN
+        let _: PostgrestResponse<Void> = try await client.from("countries")
+            .insert(Country(id: 10, name: "Australia"))
+            .execute()
+        // SKIP NOWARN
+        let _: PostgrestResponse<Void> = try await client.from("countries")
+            .insert(Country(id: 11, name: "Austria"))
+            .execute()
+        // SKIP NOWARN
+        let _: PostgrestResponse<Void> = try await client.from("countries")
+            .insert(Country(id: 12, name: "Brazil"))
+            .execute()
+
+        // Test like filter (case-sensitive)
+        let likeResp: PostgrestResponse<[Country]> = try await client
+            .from("countries")
+            .select()
+            .like("name", pattern: "Aus%")
+            .execute(options: FetchOptions(head: false, count: CountOption.exact))
+        XCTAssertEqual(likeResp.value.count, 2) // Australia and Austria
+
+        // Test ilike filter (case-insensitive)
+        let ilikeResp: PostgrestResponse<[Country]> = try await client
+            .from("countries")
+            .select()
+            .ilike("name", pattern: "aus%")
+            .execute(options: FetchOptions(head: false, count: CountOption.exact))
+        XCTAssertEqual(ilikeResp.value.count, 2) // Australia and Austria
+
+        // Test is filter for null check
+        let isNullResp: PostgrestResponse<[Country]> = try await client
+            .from("countries")
+            .select()
+            .is("gdp", value: nil)
+            .execute(options: FetchOptions(head: false, count: CountOption.exact))
+        XCTAssertGreaterThanOrEqual(isNullResp.value.count, 3) // All 3 have nil gdp
+
+        // Clean up
+        // SKIP NOWARN
+        let _: PostgrestResponse<Void> = try await client.from("countries").delete().gte("id", value: 0).execute()
+    }
+
+    func testSkipSupabaseOptions() throws {
+        // Verify CountOption enum values
+        let counts: [CountOption] = [.exact, .planned, .estimated]
+        XCTAssertEqual(counts.count, 3)
+
+        // Verify PostgrestReturningOptions enum values
+        let returningOpts: [PostgrestReturningOptions] = [.minimal, .representation]
+        XCTAssertEqual(returningOpts.count, 2)
+
+        // Verify FetchOptions construction
+        let opts = FetchOptions(head: true, count: .exact)
+        XCTAssertTrue(opts.head)
+        XCTAssertEqual(opts.count, .exact)
+
+        // Verify TextSearchType enum values
+        let searchTypes: [TextSearchType] = [.plain, .phrase, .websearch]
+        XCTAssertEqual(searchTypes.count, 3)
+    }
+
+    func testSkipSupabaseStorageOptions() throws {
+        // Verify BucketOptions construction
+        let bopts = BucketOptions(public: true, fileSizeLimit: "10mb", allowedMimeTypes: ["image/*"])
+        XCTAssertTrue(bopts.public)
+        XCTAssertEqual(bopts.fileSizeLimit, "10mb")
+
+        // Verify FileOptions construction
+        let fopts = FileOptions(contentType: "image/png", upsert: true)
+        XCTAssertEqual(fopts.contentType, "image/png")
+        XCTAssertTrue(fopts.upsert)
+        XCTAssertEqual(fopts.cacheControl, "3600")
+
+        // Verify TransformOptions construction
+        let topts = TransformOptions(width: 200, height: 100, resize: "cover", quality: 80)
+        XCTAssertEqual(topts.width, 200)
+        XCTAssertEqual(topts.height, 100)
+        XCTAssertEqual(topts.resize, "cover")
+        XCTAssertEqual(topts.quality, 80)
+
+        // Verify SearchOptions construction
+        let sopts = SearchOptions(limit: 50, offset: 10, search: "test")
+        XCTAssertEqual(sopts.limit, 50)
+        XCTAssertEqual(sopts.offset, 10)
+        XCTAssertEqual(sopts.search, "test")
+
+        // Verify DestinationOptions
+        let dopts = DestinationOptions(destinationBucket: "other")
+        XCTAssertEqual(dopts.destinationBucket, "other")
     }
 }
