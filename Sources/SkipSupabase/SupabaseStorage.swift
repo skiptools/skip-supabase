@@ -176,10 +176,6 @@ public struct StorageClientConfiguration: Sendable {
     }
 }
 
-enum FileUpload {
-    case data(Data)
-    case url(URL)
-}
 
 /// Supabase Storage File API
 public class StorageFileApi: StorageApi, @unchecked Sendable {
@@ -222,14 +218,15 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
     ///   - path: The relative file path. Should be of the format `folder/subfolder/filename.png`. The bucket must already exist before attempting to upload.
     ///   - fileURL: The file URL to be stored in the bucket.
     ///   - options: The options for the uploaded file.
-    @available(*, unavailable)
+    /// Uploads a file from a URL to an existing bucket.
     @discardableResult
     public func upload(
         _ path: String,
         fileURL: URL,
         options: FileOptions = FileOptions()
     ) async throws -> FileUploadResponse {
-        fatalError("TODO: upload")
+        let data = try Data(contentsOf: fileURL)
+        return try await upload(path, data: data, options: options)
     }
 
     /// Replaces an existing file at the specified path with a new one.
@@ -257,14 +254,15 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
     ///   - path: The relative file path. Should be of the format `folder/subfolder`. The bucket already exist before attempting to upload.
     ///   - fileURL: The file URL to be stored in the bucket.
     ///   - options: The options for the updated file.
-    @available(*, unavailable)
+    /// Replaces an existing file at the specified path with a file from a URL.
     @discardableResult
     public func update(
         _ path: String,
         fileURL: URL,
         options: FileOptions = FileOptions()
     ) async throws -> FileUploadResponse {
-        fatalError("TODO: update")
+        let data = try Data(contentsOf: fileURL)
+        return try await update(path, data: data, options: options)
     }
 
     /// Moves an existing file to a new path.
@@ -303,15 +301,14 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
     ///   - expiresIn: The number of seconds until the signed URL expires. For example, `60` for a URL which is valid for one minute.
     ///   - download: Trigger a download with the specified file name.
     ///   - transform: Transform the asset before serving it to the client.
-    @available(*, unavailable)
+    /// Creates a signed URL with an optional download filename.
     public func createSignedURL(
         path: String,
         expiresIn: Int,
         download: String? = nil,
         transform: TransformOptions? = nil
     ) async throws -> URL {
-        // TODO: handle download parameter
-        return try await createSignedURL(path: path, expiresIn: expiresIn, download: false, transform: transform)
+        return try await createSignedURL(path: path, expiresIn: expiresIn, download: download != nil, transform: transform)
     }
 
     /// Creates a signed URL. Use a signed URL to share a file for a fixed amount of time.
@@ -344,28 +341,24 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
     ///   - paths: The file paths to be downloaded, including the current file names. For example `["folder/image.png", "folder2/image2.png"]`.
     ///   - expiresIn: The number of seconds until the signed URLs expire. For example, `60` for URLs which are valid for one minute.
     ///   - download: Trigger a download with the specified file name.
-    @available(*, unavailable)
+    /// Creates multiple signed URLs.
     public func createSignedURLs(
         paths: [String],
         expiresIn: Int,
         download: String? = nil
     ) async throws -> [URL] {
-        fatalError("TODO: createSignedURLs")
+        // SKIP NOWARN
+        let results = try await bucket.createSignedUrls(expiresIn: expiresIn.seconds, paths: paths.toList())
+        return Array(results).compactMap { URL(string: $0.signedURL) }
     }
 
-    /// Creates multiple signed URLs. Use a signed URL to share a file for a fixed amount of time.
-    /// - Parameters:
-    ///   - paths: The file paths to be downloaded, including the current file names. For example `["folder/image.png", "folder2/image2.png"]`.
-    ///   - expiresIn: The number of seconds until the signed URLs expire. For example, `60` for URLs which are valid for one minute.
-    ///   - download: Trigger a download with the default file name.
-    @available(*, unavailable)
+    /// Creates multiple signed URLs with a boolean download flag.
     public func createSignedURLs(
         paths: [String],
         expiresIn: Int,
         download: Bool
     ) async throws -> [URL] {
-        fatalError("TODO: createSignedURLs")
-        //try await createSignedURLs(paths: paths, expiresIn: expiresIn, download: download ? "" : nil)
+        return try await createSignedURLs(paths: paths, expiresIn: expiresIn, download: download ? "" : nil)
     }
 
     /// Deletes files within the same bucket
@@ -419,24 +412,26 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
                     height = options.height
                     quality = options.quality
                     format = options.format
-                    // resize = options.resize // TODO
+                    resize = options.resize == "cover" ? ImageTransformation.Resize.COVER : options.resize == "contain" ? ImageTransformation.Resize.CONTAIN : options.resize == "fill" ? ImageTransformation.Resize.FILL : nil
+                    if let width = options.width, let height = options.height {
+                        size(width, height)
+                    }
                 }
             }
         })
     }
 
     /// Retrieves the details of an existing file.
-    /// Needs: https://github.com/supabase-community/supabase-kt/pull/694
-    @available(*, unavailable)
     public func info(path: String) async throws -> FileObjectV2 {
-        fatalError("TODO: info")
+        // SKIP NOWARN
+        let obj = try await bucket.info(path)
+        return FileObjectV2(object: obj)
     }
 
-    /// Needs: https://github.com/supabase-community/supabase-kt/pull/694
-    /// Checks the existence of file.
-    @available(*, unavailable)
+    /// Checks the existence of a file.
     public func exists(path: String) async throws -> Bool {
-        fatalError("TODO: exists")
+        // SKIP NOWARN
+        return try await bucket.exists(path)
     }
 
     /// A simple convenience function to get the URL for an asset in a public bucket. If you do not want to use this function, you can construct the public URL by concatenating the bucket URL with the path to the asset. This function does not verify if the bucket is public. If a public URL is created for a bucket which is not public, you will not be able to download the asset.
@@ -446,15 +441,13 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
     ///  - options: Transform the asset before retrieving it on the client.
     ///
     ///  - Note: The bucket needs to be set to public, either via ``StorageBucketApi/updateBucket(_:options:)`` or by going to Storage on [supabase.com/dashboard](https://supabase.com/dashboard), clicking the overflow menu on a bucket and choosing "Make public".
-    @available(*, unavailable)
+    /// Get the URL for an asset in a public bucket with an optional download filename.
     public func getPublicURL(
         path: String,
         download: String? = nil,
         options: TransformOptions? = nil
     ) throws -> URL {
-        // TODO: handle download parameter
-        // SKIP NOWARN
-        try await getPublicURL(path, download: false, options: options)
+        return try getPublicURL(path: path, download: download != nil, options: options)
     }
 
     /// A simple convenience function to get the URL for an asset in a public bucket. If you do not want to use this function, you can construct the public URL by concatenating the bucket URL with the path to the asset. This function does not verify if the bucket is public. If a public URL is created for a bucket which is not public, you will not be able to download the asset.
@@ -490,22 +483,17 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
     /// - Parameter path: The file path, including the current file name. For example `folder/image.png`.
     /// - Returns: A URL that can be used to upload files to the bucket without further
     /// authentication.
-    @available(*, unavailable)
+    /// Creates a signed upload URL. Signed upload URLs can be used to upload files without further authentication.
     public func createSignedUploadURL(
         path: String,
         options: CreateSignedUploadURLOptions? = nil
     ) async throws -> SignedUploadURL {
-        fatalError("TODO: createSignedUploadURL")
+        // SKIP NOWARN
+        let result = try await bucket.createSignedUploadUrl(path: path, upsert: options?.upsert ?? false)
+        return SignedUploadURL(signedURL: URL(string: result.url)!, path: result.path, token: result.token)
     }
 
-    /// Upload a file with a token generated from ``StorageFileApi/createSignedUploadURL(path:)``.
-    /// - Parameters:
-    ///   - path: The file path, including the file name. Should be of the format `folder/subfolder/filename.png`. The bucket must already exist before attempting to upload.
-    ///   - token: The token generated from ``StorageFileApi/createSignedUploadURL(path:)``.
-    ///   - data: The Data to be stored in the bucket.
-    ///   - options: HTTP headers, for example `cacheControl`.
-    /// - Returns: A key pointing to stored location.
-    @available(*, unavailable)
+    /// Upload a file with a token generated from ``createSignedUploadURL(path:)``.
     @discardableResult
     public func uploadToSignedURL(
         _ path: String,
@@ -513,17 +501,19 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
         data: Data,
         options: FileOptions? = nil
     ) async throws -> SignedURLUploadResponse {
-        fatalError("TODO: uploadToSignedURL")
+        // SKIP NOWARN
+        let response = try await bucket.uploadToSignedUrl(path: path, token: token, data: data.kotlin()) {
+            if let options = options {
+                upsert = options.upsert
+                if let ctype = options.contentType {
+                    contentType = io.ktor.http.ContentType.parse(ctype)
+                }
+            }
+        }
+        return SignedURLUploadResponse(path: path, fullPath: response.key ?? path)
     }
 
-    /// Upload a file with a token generated from ``StorageFileApi/createSignedUploadURL(path:)``.
-    /// - Parameters:
-    ///   - path: The file path, including the file name. Should be of the format `folder/subfolder/filename.png`. The bucket must already exist before attempting to upload.
-    ///   - token: The token generated from ``StorageFileApi/createSignedUploadURL(path:)``.
-    ///   - fileURL: The file URL to be stored in the bucket.
-    ///   - options: HTTP headers, for example `cacheControl`.
-    /// - Returns: A key pointing to stored location.
-    @available(*, unavailable)
+    /// Upload a file from a URL with a token generated from ``createSignedUploadURL(path:)``.
     @discardableResult
     public func uploadToSignedURL(
         _ path: String,
@@ -531,57 +521,11 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
         fileURL: URL,
         options: FileOptions? = nil
     ) async throws -> SignedURLUploadResponse {
-        try await _uploadToSignedURL(
-            path: path,
-            token: token,
-            file: .url(fileURL),
-            options: options
-        )
-    }
-
-    private func _uploadToSignedURL(
-        path: String,
-        token: String,
-        file: FileUpload,
-        options: FileOptions?
-    ) async throws -> SignedURLUploadResponse {
-        fatalError("TODO: _uploadToSignedURL")
-
-        //    let options = options ?? defaultFileOptions
-        //    var headers = options.headers.map { HTTPFields($0) } ?? HTTPFields()
-        //
-        //    headers[.xUpsert] = "\(options.upsert)"
-        //    headers[.duplex] = options.duplex
-        //
-        //    let formData = MultipartFormData()
-        //    file.encode(to: formData, withPath: path, options: options)
-        //
-        //    struct UploadResponse: Decodable {
-        //      let Key: String
-        //    }
-        //
-        //    let fullPath = try await execute(
-        //      HTTPRequest(
-        //        url: configuration.url
-        //          .appendingPathComponent("object/upload/sign/\(bucketId)/\(path)"),
-        //        method: .put,
-        //        query: [URLQueryItem(name: "token", value: token)],
-        //        formData: formData,
-        //        options: options,
-        //        headers: headers
-        //      )
-        //    )
-        //    .decoded(as: UploadResponse.self, decoder: configuration.decoder)
-        //    .Key
-        //
-        //    return SignedURLUploadResponse(path: path, fullPath: fullPath)
+        let data = try Data(contentsOf: fileURL)
+        return try await uploadToSignedURL(path, token: token, data: data, options: options)
     }
 }
 
-//extension HTTPField.Name {
-//  static let duplex = Self("duplex")!
-//  static let xUpsert = Self("x-upsert")!
-//}
 
 public struct BucketOptions: Sendable {
     /// The visibility of the bucket. Public buckets don't require an authorization token to download objects, but still require a valid token for all other operations. Bu default, buckets are private.
@@ -871,6 +815,22 @@ public struct FileObjectV2: Identifiable, Hashable, Decodable, Sendable {
     public let etag: String?
     public let lastModified: Date?
     public let metadata: [String: AnyJSON]?
+
+    init(object: io.github.jan.supabase.storage.FileObjectV2) {
+        self.id = object.id ?? ""
+        self.version = object.version ?? ""
+        self.name = object.name
+        self.bucketId = object.bucketId ?? nil
+        self.updatedAt = instant2date(object.updatedAt)
+        self.createdAt = instant2date(object.createdAt)
+        self.lastAccessedAt = instant2date(object.lastAccessedAt)
+        self.size = Int(object.size)
+        self.cacheControl = object.cacheControl
+        self.contentType = nil // exposed as a lazy property in Kotlin, use rawContentType
+        self.etag = object.etag
+        self.lastModified = instant2date(object.lastModified)
+        self.metadata = nil // JSON metadata not converted
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
