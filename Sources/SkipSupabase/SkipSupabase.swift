@@ -120,7 +120,8 @@ func createSupabaseDateFormatter(forDecoding: Bool, fractional: Bool = false) ->
 }
 
 class CodableSerializer: io.github.jan.supabase.SupabaseSerializer {
-    override func encode<T: Any>(type: kotlin.reflect.KType, value: T) -> String {
+    override func encode<T>(type: kotlin.reflect.KType, value: T) -> String {
+        // SKIP REPLACE: var v: Any = value as Any
         var v: Any = value
         // individual values are wrapped in a Collections$SingletonList instance, so they need to be converted to a skip.lib.Array to encode them
         if let collection = v as? java.util.Collection<Any> {
@@ -136,7 +137,7 @@ class CodableSerializer: io.github.jan.supabase.SupabaseSerializer {
     }
 
     // SKIP INSERT: @OptIn(ExperimentalStdlibApi::class)
-    override func decode<T: Any>(type: kotlin.reflect.KType, value: String) -> T {
+    override func decode<T>(type: kotlin.reflect.KType, value: String) -> T {
         fatalError("deserialize requires reified type; decode at call site instead")
 
 //        // cannot use Kotlin serialization (which may not be compatible with our Codable serialization)

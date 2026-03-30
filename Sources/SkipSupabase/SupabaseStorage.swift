@@ -394,6 +394,7 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
                 search = options.search
                 if let sortByColumn = options.sortBy?.column,
                     let sortByOrder = options.sortBy?.order {
+                    // SKIP REPLACE: sortBy(sortByColumn, io.github.jan.supabase.storage.SortOrder.valueOf(sortByOrder.uppercase()))
                     sortBy(column: sortByColumn, order: sortByOrder)
                 }
             }
