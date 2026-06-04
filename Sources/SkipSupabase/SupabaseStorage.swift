@@ -208,8 +208,18 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
                 contentType = io.ktor.http.ContentType.parse(ctype)
             }
             //duplex = options.duplex
-            //metadata = options.metadata
-            //headers = options.headers
+            if let md = dict2JsonObject(options.metadata) {
+                userMetadata = md
+            }
+            if let hdrs = options.headers, !hdrs.isEmpty {
+                httpOverride {
+                    for key in hdrs.keys {
+                        if let value = hdrs[key] {
+                            headers.append(key, value)
+                        }
+                    }
+                }
+            }
         })
     }
 
@@ -245,6 +255,18 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
             upsert = options.upsert
             if let ctype = options.contentType {
                 contentType = io.ktor.http.ContentType.parse(ctype)
+            }
+            if let md = dict2JsonObject(options.metadata) {
+                userMetadata = md
+            }
+            if let hdrs = options.headers, !hdrs.isEmpty {
+                httpOverride {
+                    for key in hdrs.keys {
+                        if let value = hdrs[key] {
+                            headers.append(key, value)
+                        }
+                    }
+                }
             }
         })
     }
@@ -510,6 +532,18 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
                 if let ctype = options.contentType {
                     contentType = io.ktor.http.ContentType.parse(ctype)
                 }
+                if let md = dict2JsonObject(options.metadata) {
+                    userMetadata = md
+                }
+                if let hdrs = options.headers, !hdrs.isEmpty {
+                    httpOverride {
+                        for key in hdrs.keys {
+                            if let value = hdrs[key] {
+                                headers.append(key, value)
+                            }
+                        }
+                    }
+                }
             }
         }
         return SignedURLUploadResponse(path: path, fullPath: response.key ?? path)
@@ -765,7 +799,7 @@ public struct FileObject: Identifiable, Hashable, Codable, Sendable {
         self.updatedAt = instant2date(object.updatedAt)
         self.createdAt = instant2date(object.createdAt)
         self.lastAccessedAt = instant2date(object.lastAccessedAt)
-        //self.metadata = object.metadata
+        self.metadata = jsonObject2Dict(object.metadata)
         //self.buckets = object.buckets
     }
 
@@ -833,7 +867,7 @@ public struct FileObjectV2: Identifiable, Hashable, Decodable, Sendable {
         self.contentType = nil // exposed as a lazy property in Kotlin, use rawContentType
         self.etag = object.etag
         self.lastModified = instant2date(object.lastModified)
-        self.metadata = nil // JSON metadata not converted
+        self.metadata = jsonObject2Dict(object.metadata)
     }
 
     enum CodingKeys: String, CodingKey {

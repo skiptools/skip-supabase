@@ -431,6 +431,36 @@ final class SkipSupabaseTests: XCTestCase {
         let _: PostgrestResponse<Void> = try await client.from("countries").delete().gte("id", value: 0).execute()
     }
 
+    /// Verifies that user metadata supplied at upload time round-trips through
+    /// `info()` and that custom request headers don't break the upload path.
+    func testSupabaseStorageMetadataRoundTrip() async throws {
+        let bucketName = "images"
+        let fileName = "metadata-test-\(UUID().uuidString).png"
+        let path = "public/" + fileName
+        let fileData = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mP4z8AAAAMBAQD3A0FDAAAAAElFTkSuQmCC")!
+
+        let images = client.storage.from(bucketName)
+
+        let inputMetadata: [String: AnyJSON] = [
+            "label": .string("test-image"),
+            "weight": .integer(42),
+            "active": .bool(true),
+        ]
+        let _: FileUploadResponse = try await images.upload(path, data: fileData, options: FileOptions(
+            contentType: "image/png",
+            upsert: true,
+            metadata: inputMetadata,
+            headers: ["X-Skip-Test-Header": "custom-value"]
+        ))
+
+        let info: FileObjectV2 = try await images.info(path: path)
+        let received = try XCTUnwrap(info.metadata, "metadata should be populated after upload with metadata")
+        XCTAssertEqual(AnyJSON.string("test-image"), received["label"])
+        XCTAssertEqual(AnyJSON.bool(true), received["active"])
+
+        let _ = try await images.remove(paths: [path])
+    }
+
     func testSkipSupabaseOptions() throws {
         // Verify CountOption enum values
         let counts: [CountOption] = [.exact, .planned, .estimated]
