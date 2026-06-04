@@ -101,7 +101,8 @@ func dict2JsonObject(_ dict: [String: AnyJSON]?) -> kotlinx.serialization.json.J
     return nil
 }
 
-func instant2date(_ instant: kotlinx.datetime.Instant?) -> Date? {
+// SKIP INSERT: @OptIn(kotlin.time.ExperimentalTime::class)
+func instant2date(_ instant: kotlin.time.Instant?) -> Date? {
     guard let instant = instant else { return nil }
     return Date(platformValue: java.util.Date(instant.toEpochMilliseconds()))
 }
