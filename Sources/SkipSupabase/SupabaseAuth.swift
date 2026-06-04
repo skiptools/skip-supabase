@@ -179,11 +179,13 @@ public class Session {
     }
 
     /// The epoch timestamp (seconds since 1970) when the session expires.
+    // SKIP INSERT: @OptIn(kotlin.time.ExperimentalTime::class)
     public var expiresAt: Double {
         Double(session.expiresAt.epochSeconds)
     }
 }
 
+// SKIP INSERT: @OptIn(kotlin.time.ExperimentalTime::class)
 public class User {
     fileprivate let userInfo: io.github.jan.supabase.auth.user.UserInfo
 

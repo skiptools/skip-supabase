@@ -49,7 +49,7 @@ public class StorageBucketApi: StorageApi, @unchecked Sendable {
     /// Retrieves the details of all Storage buckets within an existing project.
     public func listBuckets() async throws -> [Bucket] {
         // SKIP NOWARN
-        try await Array(storage.retrieveBuckets()).map({ Bucket(bucket: $0) })
+        try await Array(storage.listBuckets()).map({ Bucket(bucket: $0) })
     }
 
     /// Retrieves the details of an existing Storage bucket.
@@ -57,10 +57,10 @@ public class StorageBucketApi: StorageApi, @unchecked Sendable {
     ///   - id: The unique identifier of the bucket you would like to retrieve.
     public func getBucket(_ id: String) async throws -> Bucket {
         // SKIP NOWARN
-        guard let bucket = storage.retrieveBucketById(id) else {
+        guard let bucket = try await storage.getBucket(id) else {
             throw BucketNotFoundError(localizedDescription: "No such bucket: \(id)")
         }
-        try await Bucket(bucket: bucket)
+        return Bucket(bucket: bucket)
     }
 
     /// Creates a new Storage bucket.
@@ -326,11 +326,13 @@ public class StorageFileApi: StorageApi, @unchecked Sendable {
         // SKIP NOWARN
         URL(string: try await bucket.createSignedUrl(path: path, expiresIn: expiresIn.seconds) {
             if let options = transform {
-                quality = options.quality
-                format = options.format
-                resize = options.resize == "cover" ? ImageTransformation.Resize.COVER : options.resize == "contain" ? ImageTransformation.Resize.CONTAIN : options.resize == "fill" ? ImageTransformation.Resize.FILL : nil
-                if let width = options.width, let height = options.height {
-                    size(width, height)
+                transform {
+                    quality = options.quality
+                    format = options.format
+                    resize = options.resize == "cover" ? ImageTransformation.Resize.COVER : options.resize == "contain" ? ImageTransformation.Resize.CONTAIN : options.resize == "fill" ? ImageTransformation.Resize.FILL : nil
+                    if let width = options.width, let height = options.height {
+                        size(width, height)
+                    }
                 }
             }
         })!
@@ -752,6 +754,7 @@ public struct FileObject: Identifiable, Hashable, Codable, Sendable {
     public var metadata: [String: AnyJSON]?
     public var buckets: Bucket?
 
+    // SKIP INSERT: @OptIn(kotlin.time.ExperimentalTime::class)
     public init(object: io.github.jan.supabase.storage.FileObject) {
         self.name = object.name
         //self.bucketId = object.bucketId
@@ -816,6 +819,7 @@ public struct FileObjectV2: Identifiable, Hashable, Decodable, Sendable {
     public let lastModified: Date?
     public let metadata: [String: AnyJSON]?
 
+    // SKIP INSERT: @OptIn(kotlin.time.ExperimentalTime::class)
     init(object: io.github.jan.supabase.storage.FileObjectV2) {
         self.id = object.id ?? ""
         self.version = object.version ?? ""
@@ -859,6 +863,7 @@ public struct Bucket: Identifiable, Hashable, Codable, Sendable {
     public var allowedMimeTypes: [String]?
     public var fileSizeLimit: Int64?
 
+    // SKIP INSERT: @OptIn(kotlin.time.ExperimentalTime::class)
     fileprivate init(bucket: io.github.jan.supabase.storage.Bucket) {
         self.id = bucket.id
         self.name = bucket.name
