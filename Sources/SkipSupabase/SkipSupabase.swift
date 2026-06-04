@@ -26,6 +26,14 @@ import io.github.jan.supabase.postgrest.query.Order
 
 import io.github.jan.supabase.SupabaseSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.serializer
 import kotlin.time.Duration.Companion.seconds
 import kotlin.reflect.KType
@@ -96,9 +104,85 @@ public enum AnyJSON: Hashable {
     case array(JSONArray)
 }
 
+/// Convert a Swift `[String: AnyJSON]?` to a Kotlin `JsonObject?`.
+/// Returns `nil` when the input is `nil`.
 func dict2JsonObject(_ dict: [String: AnyJSON]?) -> kotlinx.serialization.json.JsonObject? {
-    // TODO: convert Swift [String: AnyJSON]? parameter to Kotlin JsonObject?
-    return nil
+    guard let dict = dict else { return nil }
+    let map = kotlin.collections.mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+    for key in dict.keys {
+        if let value = dict[key] {
+            map.put(key, anyJSON2JsonElement(value))
+        }
+    }
+    return kotlinx.serialization.json.JsonObject(map)
+}
+
+/// Recursively convert an `AnyJSON` value to a Kotlin `JsonElement`.
+func anyJSON2JsonElement(_ value: AnyJSON) -> kotlinx.serialization.json.JsonElement {
+    switch value {
+    case .null:
+        return kotlinx.serialization.json.JsonNull
+    case .bool(let b):
+        return kotlinx.serialization.json.JsonPrimitive(b)
+    case .integer(let i):
+        return kotlinx.serialization.json.JsonPrimitive(i)
+    case .double(let d):
+        return kotlinx.serialization.json.JsonPrimitive(d)
+    case .string(let s):
+        return kotlinx.serialization.json.JsonPrimitive(s)
+    case .object(let obj):
+        return dict2JsonObject(obj)!
+    case .array(let arr):
+        let list = kotlin.collections.mutableListOf<kotlinx.serialization.json.JsonElement>()
+        for v in arr {
+            list.add(anyJSON2JsonElement(v))
+        }
+        return kotlinx.serialization.json.JsonArray(list)
+    }
+}
+
+/// Convert a Kotlin `JsonObject?` to a Swift `[String: AnyJSON]?`.
+/// Returns `nil` when the input is `nil`.
+func jsonObject2Dict(_ obj: kotlinx.serialization.json.JsonObject?) -> [String: AnyJSON]? {
+    guard let obj = obj else { return nil }
+    var result: [String: AnyJSON] = [:]
+    for entry in obj {
+        result[entry.key] = jsonElement2AnyJSON(entry.value)
+    }
+    return result
+}
+
+/// Recursively convert a Kotlin `JsonElement` to an `AnyJSON` value.
+func jsonElement2AnyJSON(_ value: kotlinx.serialization.json.JsonElement) -> AnyJSON {
+    if value is kotlinx.serialization.json.JsonNull {
+        return .null
+    }
+    if let obj = value as? kotlinx.serialization.json.JsonObject {
+        var result: [String: AnyJSON] = [:]
+        for entry in obj {
+            result[entry.key] = jsonElement2AnyJSON(entry.value)
+        }
+        return .object(result)
+    }
+    if let array = value as? kotlinx.serialization.json.JsonArray {
+        return .array(Array(array).map { jsonElement2AnyJSON($0) })
+    }
+    if let primitive = value as? kotlinx.serialization.json.JsonPrimitive {
+        if primitive.isString {
+            return .string(primitive.content)
+        }
+        if let b = primitive.booleanOrNull {
+            return .bool(b)
+        }
+        if let l = primitive.longOrNull {
+            return .integer(Int(l))
+        }
+        if let d = primitive.doubleOrNull {
+            return .double(d)
+        }
+        return .string(primitive.content)
+    }
+    return .null
 }
 
 // SKIP INSERT: @OptIn(kotlin.time.ExperimentalTime::class)

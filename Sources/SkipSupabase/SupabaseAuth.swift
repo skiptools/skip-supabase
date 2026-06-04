@@ -194,8 +194,8 @@ public class User {
     }
 
     public var id: UUID { UUID(uuidString: userInfo.id)! }
-//    public var appMetadata: [String: AnyJSON]
-//    public var userMetadata: [String: AnyJSON]
+    public var appMetadata: [String: AnyJSON] { jsonObject2Dict(userInfo.appMetadata) ?? [:] }
+    public var userMetadata: [String: AnyJSON] { jsonObject2Dict(userInfo.userMetadata) ?? [:] }
     public var aud: String { userInfo.aud }
     public var confirmationSentAt: Date? { instant2date(userInfo.confirmationSentAt) }
     public var recoverySentAt: Date? { instant2date(userInfo.recoverySentAt) }
