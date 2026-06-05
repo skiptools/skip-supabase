@@ -461,6 +461,60 @@ final class SkipSupabaseTests: XCTestCase {
         let _ = try await images.remove(paths: [path])
     }
 
+    /// Exercises the Realtime wrapper's construction path without depending on
+    /// realtime being enabled on the test project. Verifies that:
+    ///  - `client.channel(_:)` returns a channel with the expected topic
+    ///  - `onPostgresChange` returns a `RealtimeSubscription`
+    ///  - `cancel()` and `removeChannel(_:)` are safe to call before subscribing
+    func testSupabaseRealtimeAPI() async throws {
+        let topic = "skip-test-\(UUID().uuidString)"
+        let channel = client.channel(topic)
+        // Both platforms expose the topic with the realtime transport's
+        // `"realtime:"` prefix (matching supabase-swift's behavior).
+        XCTAssertEqual("realtime:\(topic)", channel.topic)
+
+        let sub = channel.onPostgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "countries"
+        ) { _ in
+            // not asserted here — Phase 1 just verifies the wiring compiles and runs
+        }
+
+        // Calling cancel before subscribe should be a no-op (cancel an idle Job/token).
+        sub.cancel()
+        await client.removeChannel(channel)
+    }
+
+    #if SKIP
+    /// Pure construction test for the postgres-change action types. Runs offline.
+    /// Android-only because supabase-swift's matching types have a `rawMessage`
+    /// field with no public initializer.
+    func testSupabaseRealtimeActionTypes() throws {
+        let cols = [Column(name: "id", type: "int"), Column(name: "name", type: "text")]
+        let ts = Date()
+
+        let insert = InsertAction(columns: cols, commitTimestamp: ts, record: ["id": .integer(1), "name": .string("A")])
+        XCTAssertEqual(2, insert.columns.count)
+        XCTAssertEqual(AnyJSON.string("A"), insert.record["name"])
+
+        let update = UpdateAction(columns: cols, commitTimestamp: ts,
+                                  record: ["name": .string("B")],
+                                  oldRecord: ["name": .string("A")])
+        XCTAssertEqual(AnyJSON.string("B"), update.record["name"])
+        XCTAssertEqual(AnyJSON.string("A"), update.oldRecord["name"])
+
+        let delete = DeleteAction(columns: cols, commitTimestamp: ts, oldRecord: ["id": .integer(1)])
+        XCTAssertEqual(AnyJSON.integer(1), delete.oldRecord["id"])
+
+        let any: AnyAction = .insert(insert)
+        switch any {
+        case .insert(let i): XCTAssertEqual(2, i.columns.count)
+        case .update, .delete: XCTFail("expected insert case")
+        }
+    }
+    #endif
+
     func testSkipSupabaseOptions() throws {
         // Verify CountOption enum values
         let counts: [CountOption] = [.exact, .planned, .estimated]

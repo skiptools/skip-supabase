@@ -16,6 +16,8 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
+import io.github.jan.supabase.realtime.Realtime
+import io.github.jan.supabase.realtime.realtime
 
 import io.github.jan.supabase.postgrest.RpcMethod
 import io.github.jan.supabase.postgrest.rpc
@@ -78,6 +80,7 @@ public class SupabaseClient {
                     cache = io.github.jan.supabase.storage.resumable.MemoryResumableCache()
                 }
             }
+            install(Realtime)
         }
     }
 }
