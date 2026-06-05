@@ -110,13 +110,11 @@ public final class RealtimeChannelV2 {
         self.channel = channel
     }
 
-    /// The channel topic, without supabase-kt's internal `realtime:` prefix.
+    /// The channel topic. Matches supabase-swift's `RealtimeChannelV2.topic`,
+    /// which includes the internal `"realtime:"` prefix that the realtime
+    /// transport uses on the wire.
     public var topic: String {
-        let t = channel.topic
-        if t.hasPrefix("realtime:") {
-            return String(t.dropFirst(9))
-        }
-        return t
+        return channel.topic
     }
 
     /// Subscribes the channel and starts delivering events.

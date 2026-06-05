@@ -469,7 +469,9 @@ final class SkipSupabaseTests: XCTestCase {
     func testSupabaseRealtimeAPI() async throws {
         let topic = "skip-test-\(UUID().uuidString)"
         let channel = client.channel(topic)
-        XCTAssertEqual(topic, channel.topic)
+        // Both platforms expose the topic with the realtime transport's
+        // `"realtime:"` prefix (matching supabase-swift's behavior).
+        XCTAssertEqual("realtime:\(topic)", channel.topic)
 
         let sub = channel.onPostgresChange(
             AnyAction.self,
