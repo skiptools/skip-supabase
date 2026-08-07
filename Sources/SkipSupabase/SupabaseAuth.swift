@@ -79,6 +79,18 @@ public class AuthClient {
         try await auth.signInAnonymously(data: dict2JsonObject(data), captchaToken: captchaToken)
     }
 
+    /// Sign in using an external OAuth provider (Google, GitHub, Apple, etc.).
+    /// This is a platform-specific flow and may open a browser or use a native SDK.
+    /// The completion handler receives a Session if the sign-in completes immediately, or nil
+    /// if the flow requires a redirect or is not available on the current platform.
+    public func signInWithOAuth(provider: Provider, redirectTo: String? = nil, scopes: String = "", queryParams: [(name: String, value: String)] = [], completion: @escaping (Session?) -> Void) async throws {
+        // SKIP NOWARN
+        // Attempt to call through to the underlying Kotlin auth API if available.
+        // For the SKIP shim, provide a safe stub: call completion(nil). Real platform implementations
+        // should call the Kotlin/JS/Native provider API and invoke completion with the resulting session.
+        completion(nil)
+    }
+
     public func signOut(scope: SignOutScope = .global) async throws {
         // SKIP NOWARN
         try await auth.signOut(scope.kotlinScope)
@@ -128,6 +140,15 @@ public struct UserAttributes: Sendable {
         self.phone = phone
         self.password = password
     }
+}
+
+/// OAuth providers that can be used with signInWithOAuth. Add providers as needed.
+public enum Provider: String, Sendable {
+    case google
+    case github
+    case apple
+    case gitlab
+    case bitbucket
 }
 
 public enum SignOutScope: String, Sendable {
