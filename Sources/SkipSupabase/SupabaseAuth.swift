@@ -85,32 +85,60 @@ public class AuthClient {
     /// if the flow requires a redirect or is not available on the current platform.
     public func signInWithOAuth(provider: Provider, redirectTo: String? = nil, scopes: String = "", queryParams: [(name: String, value: String)] = [], completion: @escaping (Session?) -> Void) async throws {
         // SKIP NOWARN
-        // Map Provider to Kotlin provider object and invoke signInWith builder when available.
+        // Build redirectTo with encoded query params if provided. This avoids depending on
+        // platform-specific builder features and keeps query params attached to the redirect URL.
+        var redirectToWithParams: String? = nil
+        if let redirectTo = redirectTo {
+            if queryParams.isEmpty {
+                redirectToWithParams = redirectTo
+            } else {
+                let encodedPairs = queryParams.compactMap { pair -> String? in
+                    guard let name = pair.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                          let value = pair.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { return nil }
+                    return "\(name)=\(value)"
+                }
+                if !encodedPairs.isEmpty {
+                    let separator = redirectTo.contains("?") ? "&" : "?"
+                    redirectToWithParams = redirectTo + separator + encodedPairs.joined(separator: "&")
+                } else {
+                    redirectToWithParams = redirectTo
+                }
+            }
+        } else if !queryParams.isEmpty {
+            // No redirectTo provided but query params exist — platform-specific flows may require a redirect URL.
+            // For now leave redirectToWithParams nil and document TODO for platform wiring.
+            // TODO: Consider constructing a default redirect URL or surface an error to the caller.
+            redirectToWithParams = nil
+        }
+
+        func applyBuilder(_ builder: @escaping () -> Void) async throws {
+            try await builder()
+        }
+
         switch provider {
         case .google:
             try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.Google) {
-                if let redirectTo = redirectTo { self.redirectTo = redirectTo }
+                if let r = redirectToWithParams { self.redirectTo = r }
                 if !scopes.isEmpty { self.scopes = scopes }
-                // TODO: map queryParams if the Kotlin builder supports it
             }
         case .github:
             try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.GitHub) {
-                if let redirectTo = redirectTo { self.redirectTo = redirectTo }
+                if let r = redirectToWithParams { self.redirectTo = r }
                 if !scopes.isEmpty { self.scopes = scopes }
             }
         case .apple:
             try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.Apple) {
-                if let redirectTo = redirectTo { self.redirectTo = redirectTo }
+                if let r = redirectToWithParams { self.redirectTo = r }
                 if !scopes.isEmpty { self.scopes = scopes }
             }
         case .gitlab:
             try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.GitLab) {
-                if let redirectTo = redirectTo { self.redirectTo = redirectTo }
+                if let r = redirectToWithParams { self.redirectTo = r }
                 if !scopes.isEmpty { self.scopes = scopes }
             }
         case .bitbucket:
             try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.Bitbucket) {
-                if let redirectTo = redirectTo { self.redirectTo = redirectTo }
+                if let r = redirectToWithParams { self.redirectTo = r }
                 if !scopes.isEmpty { self.scopes = scopes }
             }
         }
