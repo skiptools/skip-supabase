@@ -16,6 +16,12 @@ import io.github.jan.supabase.auth.minimalSettings
 
 #if SKIP
 
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
 // SKIP NOWARN
 // This extension will be moved into its extended type definition when translated to Kotlin. It will not be able to access this file's private types or fileprivate members
 extension SupabaseClient {
@@ -143,12 +149,33 @@ public class AuthClient {
             }
         }
 
-        // If a session was created synchronously, return it; otherwise indicate the flow requires a redirect or is incomplete.
+        // If a session was created synchronously, return it; otherwise attempt to open
+        // the redirect URL in the system browser when available and indicate the flow
+        // requires a redirect by returning nil in the completion.
         if let s = auth.currentSessionOrNull() {
             completion(Session(session: s))
         } else {
+            if let redirect = redirectToWithParams {
+                openURL(redirect)
+            }
             completion(nil)
         }
+    }
+
+    // Open a URL in the system browser or via the platform's APIs. This is best-effort
+    // and intended for use when an OAuth provider flow requires a redirect.
+    fileprivate func openURL(_ urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        #if canImport(UIKit)
+        DispatchQueue.main.async {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        }
+        #elseif canImport(AppKit)
+        NSWorkspace.shared.open(url)
+        #else
+        // Fallback: print the URL so calling apps can handle it.
+        print("Open URL: \(url.absoluteString)")
+        #endif
     }
 
     public func signOut(scope: SignOutScope = .global) async throws {
