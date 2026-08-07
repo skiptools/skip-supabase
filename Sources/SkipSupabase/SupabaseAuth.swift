@@ -166,7 +166,10 @@ public class AuthClient {
     // and intended for use when an OAuth provider flow requires a redirect.
     fileprivate func openURL(_ urlString: String) {
         guard let url = URL(string: urlString) else { return }
-        #if canImport(UIKit)
+        #if canImport(AuthenticationServices) && canImport(UIKit)
+        // Prefer ASWebAuthenticationSession on iOS for OAuth flows.
+        importAuthenticationSessionIfNeeded(url)
+        #elseif canImport(UIKit)
         DispatchQueue.main.async {
             UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
@@ -176,6 +179,41 @@ public class AuthClient {
         // Fallback: print the URL so calling apps can handle it.
         print("Open URL: \(url.absoluteString)")
         #endif
+    }
+
+    #if canImport(AuthenticationServices) && canImport(UIKit)
+    // Use ASWebAuthenticationSession to open URL and allow the system to handle callback.
+    private func importAuthenticationSessionIfNeeded(_ url: URL) {
+        DispatchQueue.main.async {
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: nil) { callbackURL, error in
+                // No-op: the flow will be handled by the Supabase SDK or by the app's URL handler.
+                if let err = error {
+                    // don't crash in test
+                    print("ASWebAuthenticationSession error: \(err)")
+                }
+            }
+            session.presentationContextProvider = UIApplication.shared.connectedScenes.first as? ASWebAuthenticationPresentationContextProviding
+            session.start()
+        }
+    }
+    #endif
+
+    /// Construct the standard Supabase authorize URL for a provider and open it in the platform browser.
+    /// This is a best-effort native helper for platforms where the SDK doesn't provide a native flow.
+    public func signInWithOAuthNative(supabaseURL: URL, provider: Provider, redirectTo: String?, scopes: String = "", queryParams: [(name: String, value: String)] = []) {
+        var components = URLComponents(url: supabaseURL, resolvingAgainstBaseURL: false)
+        // Supabase authorize path is typically /auth/v1/authorize
+        components?.path = (components?.path ?? "") + "/auth/v1/authorize"
+
+        var items: [URLQueryItem] = [URLQueryItem(name: "provider", value: provider.rawValue)]
+        if let redirectTo = redirectTo { items.append(URLQueryItem(name: "redirect_to", value: redirectTo)) }
+        if !scopes.isEmpty { items.append(URLQueryItem(name: "scopes", value: scopes)) }
+        for p in queryParams { items.append(URLQueryItem(name: p.name, value: p.value)) }
+        components?.queryItems = items
+
+        if let url = components?.url {
+            openURL(url.absoluteString)
+        }
     }
 
     public func signOut(scope: SignOutScope = .global) async throws {
