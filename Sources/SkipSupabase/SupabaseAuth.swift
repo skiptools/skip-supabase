@@ -85,10 +85,42 @@ public class AuthClient {
     /// if the flow requires a redirect or is not available on the current platform.
     public func signInWithOAuth(provider: Provider, redirectTo: String? = nil, scopes: String = "", queryParams: [(name: String, value: String)] = [], completion: @escaping (Session?) -> Void) async throws {
         // SKIP NOWARN
-        // Attempt to call through to the underlying Kotlin auth API if available.
-        // For the SKIP shim, provide a safe stub: call completion(nil). Real platform implementations
-        // should call the Kotlin/JS/Native provider API and invoke completion with the resulting session.
-        completion(nil)
+        // Map Provider to Kotlin provider object and invoke signInWith builder when available.
+        switch provider {
+        case .google:
+            try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.Google) {
+                if let redirectTo = redirectTo { self.redirectTo = redirectTo }
+                if !scopes.isEmpty { self.scopes = scopes }
+                // TODO: map queryParams if the Kotlin builder supports it
+            }
+        case .github:
+            try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.GitHub) {
+                if let redirectTo = redirectTo { self.redirectTo = redirectTo }
+                if !scopes.isEmpty { self.scopes = scopes }
+            }
+        case .apple:
+            try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.Apple) {
+                if let redirectTo = redirectTo { self.redirectTo = redirectTo }
+                if !scopes.isEmpty { self.scopes = scopes }
+            }
+        case .gitlab:
+            try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.GitLab) {
+                if let redirectTo = redirectTo { self.redirectTo = redirectTo }
+                if !scopes.isEmpty { self.scopes = scopes }
+            }
+        case .bitbucket:
+            try await auth.signInWith(io.github.jan.supabase.auth.providers.builtin.Bitbucket) {
+                if let redirectTo = redirectTo { self.redirectTo = redirectTo }
+                if !scopes.isEmpty { self.scopes = scopes }
+            }
+        }
+
+        // If a session was created synchronously, return it; otherwise indicate the flow requires a redirect or is incomplete.
+        if let s = auth.currentSessionOrNull() {
+            completion(Session(session: s))
+        } else {
+            completion(nil)
+        }
     }
 
     public func signOut(scope: SignOutScope = .global) async throws {
