@@ -18,6 +18,9 @@ import io.github.jan.supabase.auth.minimalSettings
 
 #if canImport(UIKit)
 import UIKit
+#if canImport(AuthenticationServices)
+import AuthenticationServices
+#endif
 #elseif canImport(AppKit)
 import AppKit
 #endif
@@ -192,8 +195,30 @@ public class AuthClient {
                     print("ASWebAuthenticationSession error: \(err)")
                 }
             }
-            session.presentationContextProvider = UIApplication.shared.connectedScenes.first as? ASWebAuthenticationPresentationContextProviding
+            session.presentationContextProvider = WebAuthPresentationContextProvider.shared
             session.start()
+        }
+    }
+
+    // Presentation context provider for ASWebAuthenticationSession. Keep a shared instance so it
+    // lives for the duration of the session.
+    private class WebAuthPresentationContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+        static let shared = WebAuthPresentationContextProvider()
+
+        func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+            // Prefer window from connected scenes (iOS 13+), fall back to key window.
+            if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                if let window = scene.windows.first(where: { $0.isKeyWindow }) {
+                    return window
+                }
+                return scene.windows.first ?? UIWindow()
+            }
+
+            if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
+                return window
+            }
+
+            return UIWindow()
         }
     }
     #endif
